@@ -1,0 +1,15 @@
+build/
+*.exe
+*.obj
+*.o
+*.a
+*.bin
+*.dmp
+*.elf
+*.idb
+*.i64
+*.pkg
+*.prx
+*.self
+*.so
+*.sprx
