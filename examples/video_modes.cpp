@@ -24,7 +24,7 @@ struct VideoMode
     std::string_view surface;
 };
 
-constexpr std::array<VideoMode, 7> kModes{{
+constexpr std::array<VideoMode, 8> kModes{{
     {"h264", 1080, "High", "5.1", 1920, 1088, 1920, 1088, 0, 2048, 2048, 1920,
      "NV12"},
     {"h264", 1440, "High", "5.1", 2560, 1440, 2560, 1440, 0, 2560, 2560, 2560,
@@ -39,6 +39,8 @@ constexpr std::array<VideoMode, 7> kModes{{
      "NV12"},
     {"main10", 1080, "Main10", "4.1", 1920, 1088, 1920, 1088, 0, 1920, 3840, 1920,
      "low-aligned 10-bit 4:2:0"},
+    {"vp9", 1080, "Profile 0", "4.1", 1920, 1080, 1920, 1080, 0, 2048, 2048, 1920,
+     "format 0; presentation layout untested"},
 }};
 
 constexpr const VideoMode *find_mode(std::string_view codec, std::uint32_t visible_height) noexcept
@@ -68,13 +70,14 @@ bool parse_height(std::string_view text, std::uint32_t &height) noexcept
 static_assert(find_mode("h264", 1080) != nullptr);
 static_assert(find_mode("hevc", 2160)->alternate_coded_height == 2176);
 static_assert(find_mode("main10", 1440) == nullptr);
+static_assert(find_mode("vp9", 1080)->pitch_bytes == 2048);
 } // namespace
 
 int main(int argc, char **argv)
 {
     if (argc != 3)
     {
-        std::cerr << "usage: " << argv[0] << " h264|hevc|main10 1080|1440|2160\n";
+        std::cerr << "usage: " << argv[0] << " h264|hevc|main10|vp9 1080|1440|2160\n";
         return 2;
     }
 

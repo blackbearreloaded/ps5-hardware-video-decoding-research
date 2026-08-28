@@ -27,7 +27,7 @@ Three hardware-facing stages are involved:
 
 | Stage | Responsibility | Output |
 |---|---|---|
-| Videodec2 | Parse and decode compressed AVC/HEVC access units | Caller-owned two-plane video surface |
+| Videodec2 | Parse and decode compressed AVC/HEVC/VP9 access units | Caller-owned video surface |
 | AGC | Sample the surface, convert Y'CbCr to RGB, scale, and composite | Tiled VideoOut framebuffer |
 | VideoOut | Register scanout buffers, pace flips, and drive display output | Completed display flip |
 
@@ -74,6 +74,12 @@ that the protocol layer has already established. The standalone research
 parser used AUD NAL type 9 for H.264 and type 35 for HEVC only because it
 consumed embedded Annex-B test files rather than pre-framed access units.
 
+The controlled VP9 proof used IVF as an asset container. It skipped the
+32-byte IVF file header and the 12-byte per-frame header, then submitted only
+the bounds-checked compressed frame payload. A production demuxer should
+likewise pass one already-framed VP9 payload rather than IVF or WebM container
+bytes.
+
 ## Memory contract
 
 Query every size for the selected codec/profile/resolution at runtime. The
@@ -113,8 +119,9 @@ actually yields an output on the public game path.
 ## Decode and flush behavior
 
 The tested depth-one H.264 streams returned no picture from `Decode` and
-required an immediate `Flush` for every frame. The tested HEVC streams returned
-valid output directly and required no immediate flush. The live rule is:
+required an immediate `Flush` for every frame. The tested HEVC streams and the
+controlled VP9 keyframe returned valid output directly and required no
+immediate flush. The live rule is:
 
 ```c
 decode(access_unit, frame_slot, &output);
@@ -136,6 +143,11 @@ For 8-bit H.264 and HEVC Main, the returned surface is linear NV12: one 8-bit Y
 plane followed by interleaved UV, using returned pitch and coded height. For
 Main10, each component occupies a 16-bit word but the ten meaningful bits are
 low-aligned. See [HDR and Main10](hdr.md).
+
+The VP9 Profile 0 control returned format `0`, a 2048-byte pitch, and the exact
+caller-owned frame address for a 1920x1080 picture. Its pixel content and
+presentation layout have not yet been independently validated, so do not
+promote the AVC/HEVC NV12 interpretation to a VP9 guarantee yet.
 
 AGC uses coded height to locate the chroma plane and visible dimensions to crop
 or scale. This distinction is required for the proven live 4K layout:

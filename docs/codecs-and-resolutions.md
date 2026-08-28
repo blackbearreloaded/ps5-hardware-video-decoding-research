@@ -19,11 +19,13 @@ a lower level than the configured maximum.
 | HEVC Main 1440p | Main | 5.0 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
 | HEVC Main 2160p | Main | 5.1 | 3840x2176 | 3840x2160 or 2176 | 3840x2160 | 3840 bytes |
 | HEVC Main10 1080p | Main10 | 4.1 | 1920x1088 | 1920x1088 | 1920x1080 | 1920 components / 3840 bytes |
+| VP9 1080p | Profile 0 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 2048 bytes |
 
-The 8-bit modes return NV12. The Main10 mode returns a two-plane 4:2:0 surface
-with low-aligned 10-bit values in 16-bit words. The returned format field did
-not distinguish the tested 8-bit and 10-bit paths, so negotiation, byte pitch,
-dimensions, and buffer size must select the texture interpretation.
+The console-validated AVC/HEVC 8-bit modes return NV12. The Main10 mode returns
+a two-plane 4:2:0 surface with low-aligned 10-bit values in 16-bit words. The
+returned format field did not distinguish the tested 8-bit and 10-bit paths,
+so negotiation, byte pitch, dimensions, and buffer size must select the texture
+interpretation. VP9 pixel-layout validation remains pending.
 
 ## Resolution-specific observations
 
@@ -87,11 +89,16 @@ bit. Keep HEVC Main available as SDR fallback.
 
 ## VP9 and AV1
 
-Platform-interface review found Videodec2 routes for AVC, HEVC, and VP9. VP9
-also has a codec-specific picture-information API and module route. This
-research did not run a VP9
-memory query, decode, presentation test, or benchmark, so it remains
-firmware-evidenced rather than console-proven here.
+Platform-interface review found Videodec2 routes for AVC, HEVC, and VP9. A
+subsequent firmware-6.02 console control proved the public game resource can
+query memory, create/reset the VP9 decoder, accept one locally generated
+Profile 0 keyframe, and return one valid, error-free 1920x1080 picture in the
+caller-owned direct-memory frame allocation. The returned codec was VP9, with
+pitch and byte pitch both 2048.
+
+This is a controlled decode proof, not yet a presentation or performance
+result. Profile 2, sustained throughput, 1440p, 4K, pixel-layout validation,
+and VP9 presentation remain untested.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable
 decoder backend was found on firmware 6.02. A protocol layer may be

@@ -5,13 +5,15 @@
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 Independent, console-validated interoperability research into low-latency H.264,
-HEVC, Main10/HDR, resolution scaling, zero-copy presentation, and performance
+HEVC, VP9, Main10/HDR, resolution scaling, zero-copy presentation, and performance
 measurement on PlayStation 5.
 
 The public game-process `libSceVideodec2` path decodes H.264 High and HEVC Main
-at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. AGC consumes the
-exact returned pointer, eliminating decoded-frame CPU copies. A bounded 1080p
-experiment also proves HEVC Main10 decode through public HDR VideoOut.
+at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. A controlled
+1080p keyframe also proves VP9 Profile 0 decode to caller-owned direct memory.
+AGC consumes the exact returned pointer for the validated AVC/HEVC presentation
+paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
+proves HEVC Main10 decode through public HDR VideoOut.
 
 This repository uses **hardware video decoding** deliberately. Videodec2 is the
 console's media-decoder path; the results do not imply that RDNA shader compute
@@ -28,7 +30,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 | Concrete firmware interface found; no runtime test in this research |
+| VP9 Profile 0 | One controlled 1080p frame decoded successfully; presentation and throughput untested |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
 | CI | Builds and runs the host-side contract examples |
@@ -79,7 +81,7 @@ renders the surface into a scanout framebuffer.
 | H.265 / HEVC Main | Console-proven | 8-bit 4:2:0 at 1080p, 1440p, and 2160p |
 | H.265 / HEVC Main10 | Controlled console proof | 1920x1080 BT.2020/PQ frame and caller-owned 10-bit surface |
 | HDR10 presentation | Controlled console proof | Main10 -> AGC BT.2020-NCL -> 10-bit HDR VideoOut |
-| VP9 | Platform-interface evidence | A codec-specific route exists; no benchmark |
+| VP9 Profile 0 | Controlled console proof | One 1920x1080 keyframe; caller-owned direct-memory output |
 | AV1 | Unavailable through examined APIs | No usable decoder route was identified |
 | Native 4K scanout | Not proven | Current 4K tests scale into a 1920x1080 display target |
 

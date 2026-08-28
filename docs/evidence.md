@@ -2,8 +2,8 @@
 
 ## Test boundary
 
-The console experiments ran on one PlayStation 5 with firmware 6.02 on
-2026-08-24. They used isolated, authorized test applications and a native
+The console experiments ran on one PlayStation 5 with firmware 6.02 between
+2026-08-24 and 2026-08-28. They used isolated, authorized test applications and a native
 real-time streaming prototype. Every successful milestone fixed the tested
 build and bitstream, validated exact caller-pool pointer identity, recorded
 structured results, and shut down cleanly.
@@ -20,6 +20,7 @@ measurement boundary.
 | H.264 and HEVC console runs | Known-good modes, caller-owned surfaces, resolution comparisons, pipeline depth, WPP, and practical 4K60 timing |
 | HDR and Main10 console runs | Required application capability, 10-bit VideoOut, channel packing, BT.2020/PQ conversion, and Main10 surface layout |
 | Bounded AV1 interface review | Firmware-6.02 API/backend conclusion with AVC, HEVC, and VP9 positive controls |
+| Controlled VP9 console run | Profile 0 decoder lifecycle, single-frame output metadata, and caller-owned surface identity |
 | Decoder/presenter prototype | Zero-copy pointer identity and integer luma/chroma sampling behavior |
 | Real-time streaming prototype | H.264 slice tuning, validated mode table, and live latency telemetry |
 | Application integration controls | AGC reconnect lifecycle, SDR HUD cost, display-owner handoff, source mapping, and inactive-HDR rejection |
@@ -67,6 +68,14 @@ The bounded conclusion came from reviewing the usable Videodec2 interfaces and
 codec-specific routes with AVC, HEVC, and VP9 positive controls. No equivalent
 AV1 route was identified across the examined firmware-6.02 paths.
 
+### VP9
+
+A bounded firmware-6.02 console run used the public game decoder resource and
+a locally generated 1920x1080 Profile 0 keyframe. Memory query, allocation,
+create, reset, decode, delete, and queue release all succeeded. Decode accepted
+the access unit and returned one valid, error-free VP9 picture at 1920x1080,
+with 2048-byte pitch and exact caller-pool pointer identity. No flush was needed.
+
 ## Confidence labels
 
 - **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
@@ -99,7 +108,8 @@ AV1 route was identified across the examined firmware-6.02 paths.
 - 1440p/4K Main10, B frames, dynamic HDR transitions, live HDR HUD composition,
   and native 4K HDR scanout remain untested.
 - 1440p and 4K SDR decoded surfaces were scaled into 1920x1080 VideoOut.
-- VP9 was identified through platform-interface review but was not decoded or benchmarked.
+- VP9 Profile 0 has one controlled 1080p decode proof; presentation, sustained
+  benchmarking, Profile 2, 1440p, and 4K remain untested.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 
