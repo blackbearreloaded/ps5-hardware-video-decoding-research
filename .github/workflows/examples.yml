@@ -32,6 +32,7 @@ jobs:
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/modes.cpp -o build/vp9_modes
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/packetization.cpp -o build/vp9_packetization
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr/surface_contract.cpp -o build/hdr_surface_contract
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/memory_pipeline.cpp -o build/memory_pipeline
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/timing_model.cpp -o build/timing_model
       - name: Run contract checks
         run: |
@@ -46,5 +47,6 @@ jobs:
           ! ./build/hevc_modes main invalid
           ! ./build/vp9_modes profile2 1440
           ./build/hdr_surface_contract
+          ./build/memory_pipeline
           ./build/timing_model
           ./build/vp9_packetization

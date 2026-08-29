@@ -147,6 +147,7 @@ c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hevc/modes.cpp -o build
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/modes.cpp -o build/vp9_modes
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/packetization.cpp -o build/vp9_packetization
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr/surface_contract.cpp -o build/hdr_surface_contract
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/memory_pipeline.cpp -o build/memory_pipeline
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/timing_model.cpp -o build/timing_model
 
 ./build/h264_modes high 1080
@@ -154,6 +155,7 @@ c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/timing_model.cpp
 ./build/hevc_modes main10 1080
 ./build/vp9_modes profile2 2160
 ./build/hdr_surface_contract
+./build/memory_pipeline
 ./build/timing_model
 ./build/vp9_packetization
 ```
@@ -207,6 +209,7 @@ examples/hevc/modes.cpp            HEVC Main/Main10 mode and surface selection
 examples/vp9/modes.cpp             VP9 Profile 0/2 mode and surface selection
 examples/vp9/packetization.cpp     Superframe and presentation policy
 examples/hdr/surface_contract.cpp  10-bit layouts, color matrix, and packing
+examples/common/memory_pipeline.cpp Aligned pools, gather, pointer reuse, and fences
 examples/common/timing_model.cpp   Submission, ready, and flip timing semantics
 examples/common/video_mode.hpp     Shared mode validation and reporting
 .github/workflows/examples.yml    Strict C++20 example validation

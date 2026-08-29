@@ -115,6 +115,37 @@ experiment conservatively used six. A later ordered Profile 2 decode/present
 control proved that three slots are sufficient for depth three when each
 surface is reused only after its completed flip.
 
+### Exact data movement
+
+The proven path has one intentional per-frame CPU payload copy and no decoded-
+frame CPU copy:
+
+| Boundary | Operation | Copy? |
+|---|---|---|
+| Network fragments to AU slot | Validate the complete byte count, then gather fragments in order into one free, persistently mapped direct-memory slot | Yes, CPU |
+| AU slot to Videodec2 | Pass the slot address, used byte count, and timestamp in the decoder input | No additional client copy |
+| Videodec2 to frame slot | Supply a free caller-owned direct-memory frame slot; the media engine writes decoded planes there | Hardware write |
+| Frame slot to AGC | Validate the returned address, derive plane offsets from returned geometry, and bind that exact address as the Y/UV source | No decoded-frame copy |
+| AGC to VideoOut target | Sample/convert/scale into the selected framebuffer | GPU render write |
+
+“Zero-copy” therefore describes only the decoder-to-AGC boundary. It does not
+mean zero memory traffic, direct socket-to-decoder input, or decoder output used
+as the scanout framebuffer. The compressed gather and final GPU render remain.
+
+The slot ownership sequence is:
+
+```text
+AU slot:    free -> receiver/gather -> decoder -> free
+Frame slot: free -> decoder -> presenter -> completed-flip fence -> free
+```
+
+Never overwrite an AU slot while the decoder may still read it, and never
+reuse a frame slot while decoder or GPU/VideoOut work still owns it. The
+[host-side memory pipeline example](../examples/common/memory_pipeline.cpp)
+models the gather, fixed aligned pools, pointer-membership gate, Y/UV offsets,
+same-pointer presentation, and completed-flip release without proprietary
+headers.
+
 The frame validation gate must check more than a successful return code:
 
 1. output is valid, error-free, and contains one picture;

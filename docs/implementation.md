@@ -44,6 +44,13 @@ unbounded jitter queue merely converts overload into latency.
 The following is intentionally pseudocode; the exact ABI structures and memory
 functions remain platform-specific:
 
+`gather_in_order` is the one intentional per-frame CPU payload copy: it writes
+validated encoded fragments into an already mapped AU slot. `decoder.decode`
+receives that slot's address plus a free caller-owned frame-slot address.
+`present_same_pointer` must bind the decoder's returned frame address directly;
+it must not repack or upload the decoded planes. See the runnable
+[memory-pipeline contract](../examples/common/memory_pipeline.cpp).
+
 ```cpp
 SubmitResult submit_access_unit(const EncodedAccessUnit& unit)
 {
