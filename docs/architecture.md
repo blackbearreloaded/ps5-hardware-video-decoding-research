@@ -149,9 +149,10 @@ low-aligned. See [HDR and Main10](hdr.md).
 
 The VP9 Profile 0 controls returned format `0` and exact caller-owned frame
 addresses. Returned pitch was 2048 bytes at 1920x1080, 2560 at 2560x1440, and
-3840 at 3840x2160. Pixel content and presentation layout have not yet been
-independently validated, so do not promote the AVC/HEVC NV12 interpretation to
-a VP9 guarantee yet.
+3840 at 3840x2160. A controlled 4K presentation displayed the complete source,
+expected color order, diagonal features, and fine checker detail through the
+tested linear 8-bit two-plane texture description. Treat this as validation of
+that exact Profile 0 path, not every VP9 profile or format.
 
 AGC uses coded height to locate the chroma plane and visible dimensions to crop
 or scale. This distinction is required for the proven live 4K layout:
@@ -212,9 +213,10 @@ changing decode or zero-copy ownership. Keep these operations independent:
 - aspect-fit or aspect-fill maps that source into the destination; and
 - a TV-safe inset changes only the destination viewport.
 
-The original crop is evidence-backed. At the recorded milestone, the corrected
-mapping had passed build, deployment, and deterministic image checks, while a
-matched live edge-chart acceptance run was still pending.
+The original crop is evidence-backed. A later controlled full-frame acceptance
+copied the complete current affine and enabled destination safe-area state; all
+source edges and chart regions were visible. Representative live-content
+acceptance remains a separate product test.
 
 The current linear-surface pixel shader also uses explicit integer raw-buffer
 loads. It selects one luma byte and one interleaved UV pair, with UV coordinates

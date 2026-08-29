@@ -104,6 +104,38 @@ depth-three ready maximum was 38.205 ms, and its p95 exceeded one 60 Hz frame
 interval. Product policy must therefore balance throughput against residency
 using representative live streams and callback-to-present measurements.
 
+## VP9 4K decode-to-completed-flip control
+
+The presentation control reused the exact four-tile 4K stream and the proven
+depth-one decoder tuple. Each decoded caller-owned surface was bound directly
+as the presenter's two-plane source, submitted, and held until VideoOut
+reported the corresponding completed flip. The next access unit became ready
+only after that observation, so this is a serialized, display-paced result.
+
+| Steady interval, frames 1–59 | Average | Median | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Compressed access-unit copy | 0.015 ms | 0.016 ms | 0.025 ms | 0.025 ms |
+| Decoder submission call | 12.311 ms | 12.012 ms | 15.231 ms | 15.674 ms |
+| Submission to output ready | 12.311 ms | 12.012 ms | 15.231 ms | 15.674 ms |
+| Present call to completed flip | 4.347 ms | 4.616 ms | 5.831 ms | 6.009 ms |
+| AU ready to completed flip | 16.676 ms | 16.682 ms | 16.701 ms | 16.716 ms |
+
+The 59 steady frames spanned 984.003 ms, equivalent to 59.95 FPS. The first
+frame took 60.778 ms end to end because it included decoder warm-up, presenter
+allocation and initialization, setup telemetry, and the first flip. Including
+that cold frame, all 60 frames spanned 1,044.783 ms, or 57.42 FPS.
+
+At depth one, the tested decoder returned the corresponding picture from the
+submission call, so call duration and output-ready latency are numerically
+equal. The 4.347 ms presentation interval is mostly the remaining wait to a
+60 Hz completed flip; it is not an isolated shader execution time. The
+AU-ready boundary excludes network reception, packet assembly, and callback
+scheduling, so it must not be relabeled as a live network callback result.
+
+This controlled test validates complete 4K VP9 surface presentation and steady
+60 Hz cadence. It does not replace the 187.39 FPS depth-three decode-capacity
+result or establish representative live-stream latency.
+
 ## H.264 live slice tuning at 1080p60
 
 All three runs used the same depth-one live architecture. The four-slice

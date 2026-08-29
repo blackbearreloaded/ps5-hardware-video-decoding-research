@@ -20,7 +20,7 @@ measurement boundary.
 | H.264 and HEVC console runs | Known-good modes, caller-owned surfaces, resolution comparisons, pipeline depth, WPP, and practical 4K60 timing |
 | HDR and Main10 console runs | Required application capability, 10-bit VideoOut, channel packing, BT.2020/PQ conversion, and Main10 surface layout |
 | Bounded AV1 interface review | Firmware-6.02 API/backend conclusion with AVC, HEVC, and VP9 positive controls |
-| Controlled VP9 console runs | Profile 0 lifecycle, resolution scaling, 4K tile-layout and pipeline controls, and caller-owned surface identity |
+| Controlled VP9 console runs | Profile 0 lifecycle, resolution scaling, 4K tile-layout, decoder pipeline controls, caller-owned surface identity, and decode-to-completed-flip presentation |
 | Decoder/presenter prototype | Zero-copy pointer identity and integer luma/chroma sampling behavior |
 | Real-time streaming prototype | H.264 slice tuning, validated mode table, and live latency telemetry |
 | Application integration controls | AGC reconnect lifecycle, SDR HUD cost, display-owner handoff, source mapping, and inactive-HDR rejection |
@@ -45,7 +45,7 @@ remain outside the publication.
 | Reconnect control | AGC initialization is process-global; per-stream resources can still be rebuilt |
 | HUD control | Small SDR overlay in the existing AGC submission preserved the measured latency class |
 | Display handoff control | Valid decode/AGC markers can coexist with black output when VideoOut ownership transition fails |
-| Full-frame mapping diagnosis | Inherited partial-view affine transform cropped 32 left and 16 bottom source pixels |
+| Full-frame mapping diagnosis | Inherited partial-view affine transform cropped valid pixels; a complete affine and destination safe-area control restored the full chart |
 | Raw-buffer shader audit | Current Y/UV fetches use integer point sampling; filtered scale remains untested |
 
 ### HDR and Main10
@@ -88,6 +88,13 @@ during submission, two during drain, and the complete batch sustained
 187.39 FPS. Median submission duration was 4.633 ms; median output-ready
 latency was 15.082 ms and p95 was 21.571 ms.
 
+The same four-tile stream was then presented at serialized depth one through
+the tested linear 8-bit two-plane path. The complete controlled chart was
+visible, every reported decoder and presentation stage succeeded, and the
+submitted flip marker completed. Frames 1 through 59 averaged 16.676 ms from
+AU ready to completed flip and sustained 59.95 FPS. This timing starts after
+network reception and access-unit assembly; it is not a live callback result.
+
 ## Confidence labels
 
 - **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
@@ -111,8 +118,8 @@ latency was 15.082 ms and p95 was 21.571 ms.
 - The VideoOut handoff race is the best-supported diagnosis for the observed
   intermittent black output, but the 100 ms mitigation is not a proven API
   requirement.
-- The original affine crop is evidence-backed; the corrected mapping had not
-  completed a matched live edge-chart acceptance at the recorded milestone.
+- The original affine crop and controlled corrected mapping are evidence-backed;
+  representative live-content acceptance remains untested.
 - The raw-buffer shader's point sampling is source-proven, but no matched
   filtered-versus-point visual/performance run has been completed.
 - Main10/HDR is proven for one controlled 1080p frame, not a sustained network
@@ -120,10 +127,11 @@ latency was 15.082 ms and p95 was 21.571 ms.
 - 1440p/4K Main10, B frames, dynamic HDR transitions, live HDR HUD composition,
   and native 4K HDR scanout remain untested.
 - 1440p and 4K SDR decoded surfaces were scaled into 1920x1080 VideoOut.
-- VP9 Profile 0 has controlled 60-frame decode proofs at 1080p, 1440p, and 4K;
-  presentation, Profile 2, pixel-layout validation, and representative live
-  streaming remain untested. The four-tile/depth-three result is one synthetic
-  stream, not a universal encoder or latency policy.
+- VP9 Profile 0 has controlled 60-frame decode proofs at 1080p, 1440p, and 4K,
+  plus a 4K exact-pointer decode-to-completed-flip proof for the tested linear
+  8-bit two-plane path. Profile 2 and representative live streaming remain
+  untested. The four-tile results use one synthetic stream and are not a
+  universal encoder or latency policy.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

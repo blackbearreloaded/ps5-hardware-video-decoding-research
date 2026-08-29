@@ -27,7 +27,8 @@ The console-validated AVC/HEVC 8-bit modes return NV12. The Main10 mode returns
 a two-plane 4:2:0 surface with low-aligned 10-bit values in 16-bit words. The
 returned format field did not distinguish the tested 8-bit and 10-bit paths,
 so negotiation, byte pitch, dimensions, and buffer size must select the texture
-interpretation. VP9 pixel-layout validation remains pending.
+interpretation. A controlled 4K VP9 presentation validated the tested linear
+8-bit two-plane interpretation.
 
 ## Resolution-specific observations
 
@@ -109,8 +110,15 @@ steady decode time fell to 12.376 ms. Reusing those exact four-tile bytes at
 pipeline depth three produced 58 outputs during 60 submissions, drained the
 final two, and sustained 187.39 FPS across the complete batch. Median
 submission time was 4.633 ms; median output-ready latency was 15.082 ms with a
-21.571 ms p95. Profile 2, pixel-layout validation, live VP9 behavior, and VP9
-presentation remain untested.
+21.571 ms p95.
+
+The same four-tile stream then ran through serialized depth-one decode and
+exact-pointer presentation. Frames 1 through 59 averaged 12.311 ms from
+submission to output ready and 16.676 ms from AU ready to completed flip,
+sustaining 59.95 FPS. A controlled chart showed the complete frame, expected
+color order, and fine-detail regions. This validates the tested 8-bit
+two-plane presentation path; Profile 2 and representative live VP9 behavior
+remain untested.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable
 decoder backend was found on firmware 6.02. A protocol layer may be

@@ -12,8 +12,8 @@ The public game-process `libSceVideodec2` path decodes H.264 High and HEVC Main
 at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. Controlled runs
 also prove VP9 Profile 0 decode at those resolutions, including tiled 4K and a
 correctly drained depth-three pipeline, to caller-owned direct memory.
-AGC consumes the exact returned pointer for the validated AVC/HEVC presentation
-paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
+AGC consumes the exact returned pointer for the validated AVC/HEVC/VP9
+presentation paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
 proves HEVC Main10 decode through public HDR VideoOut.
 
 This repository uses **hardware video decoding** deliberately. Videodec2 is the
@@ -31,7 +31,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 Profile 0 | Controlled decode at 1080p, 1440p, and 4K; four-tile 4K reached 79.10 FPS at depth one and 187.39 at depth three; presentation untested |
+| VP9 Profile 0 | Controlled decode at 1080p, 1440p, and 4K; four-tile 4K reached 187.39 FPS decode-only at depth three and 59.95 FPS through completed flips at serialized depth one |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
 | CI | Builds and runs the host-side contract examples |
@@ -51,11 +51,12 @@ and untested claims separate.
 | HEVC WPP | Controlled depth-three 4K throughput improved 36.2% |
 | Pipeline depth | More frames in flight improve throughput but increase frame residency |
 | VP9 4K tiling | Four tile columns improved depth-one throughput from 55.57 to 79.10 FPS with only 0.06% more encoded data |
+| VP9 4K presentation | Exact-pointer two-plane presentation sustained 59.95 FPS steady, with 16.676 ms average AU-ready-to-completed-flip latency |
 | Main10 storage | Two-plane 4:2:0 with low-aligned 10-bit words, not MSB-aligned P010 |
 | HDR output | BT.2020-NCL conversion preserves PQ into A2B10G10R10 VideoOut |
 | Reconnect lifecycle | AGC initialization is process-global; retain it while rebuilding per-stream resources |
 | In-band SDR HUD | One extra draw in the existing AGC command buffer caused no meaningful measured latency regression |
-| Source mapping | An inherited partial-view transform cropped 32 left and 16 bottom pixels despite valid full-frame decode |
+| Source mapping | An inherited partial-view transform cropped valid pixels; restoring the complete affine and destination safe-area state passed a controlled full-frame acceptance |
 | Sampling quality | The current raw-buffer shader point-samples luma/chroma; filtered downscaling remains untested |
 
 ## Proven data path
@@ -83,7 +84,7 @@ renders the surface into a scanout framebuffer.
 | H.265 / HEVC Main | Console-proven | 8-bit 4:2:0 at 1080p, 1440p, and 2160p |
 | H.265 / HEVC Main10 | Controlled console proof | 1920x1080 BT.2020/PQ frame and caller-owned 10-bit surface |
 | HDR10 presentation | Controlled console proof | Main10 -> AGC BT.2020-NCL -> 10-bit HDR VideoOut |
-| VP9 Profile 0 | Controlled console proof | 8-bit 4:2:0 at 1080p, 1440p, and 2160p; caller-owned direct-memory output |
+| VP9 Profile 0 | Controlled console proof | 8-bit 4:2:0 at 1080p, 1440p, and 2160p; caller-owned direct-memory output and 4K scaled presentation |
 | AV1 | Unavailable through examined APIs | No usable decoder route was identified |
 | Native 4K scanout | Not proven | Current 4K tests scale into a 1920x1080 display target |
 
@@ -109,6 +110,7 @@ must match before comparing platforms.
 | Controlled VP9 Profile 0 4K60 source | Single tile, depth 1, decode-only | 17.407 ms steady decode; 55.57 FPS batch throughput |
 | Controlled VP9 Profile 0 4K60 source | Four tiles, depth 1, decode-only | 12.376 ms steady decode; 79.10 FPS batch throughput |
 | Same four-tile VP9 bytes | Depth 3, decode-only | 4.633 ms median submission; 15.082 ms median ready; 187.39 FPS batch throughput |
+| Same four-tile VP9 stream | Depth 1, serialized decode/present | 12.311 ms decode/ready; 16.676 ms AU-ready-to-completed-flip; 59.95 FPS steady |
 
 The 0.333 ms depth-three figure is API submission occupancy, not decode
 latency. See [Benchmarks and measurement method](docs/benchmarks.md) for the
