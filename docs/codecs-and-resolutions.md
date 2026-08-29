@@ -96,9 +96,10 @@ Profile 0 keyframe, and return one valid, error-free 1920x1080 picture in the
 caller-owned direct-memory frame allocation. The returned codec was VP9, with
 pitch and byte pitch both 2048.
 
-This is a controlled decode proof, not yet a presentation or performance
-result. Profile 2, sustained throughput, 1440p, 4K, pixel-layout validation,
-and VP9 presentation remain untested.
+The follow-on 60-frame decode-only control averaged 5.533 ms after the cold
+frame and completed at 173.09 FPS. It proves sustained headroom for that exact
+1080p stream, not a live or matched-codec performance result. Profile 2, 1440p,
+4K, pixel-layout validation, and VP9 presentation remain untested.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable
 decoder backend was found on firmware 6.02. A protocol layer may be

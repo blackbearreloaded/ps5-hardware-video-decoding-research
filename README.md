@@ -30,7 +30,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 Profile 0 | One controlled 1080p frame decoded successfully; presentation and throughput untested |
+| VP9 Profile 0 | Controlled 1080p60 decode sustained 173.09 FPS; presentation untested |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
 | CI | Builds and runs the host-side contract examples |
@@ -102,6 +102,7 @@ must match before comparing platforms.
 | Controlled HEVC 4K, about 72 Mb/s | Depth 1, WPP off | 20.719 ms synchronous decode; 47.94 FPS batch throughput |
 | Same controlled bytes | Depth 3, WPP off | 22.993 ms ready; 128.39 FPS batch throughput |
 | Controlled HEVC 4K | Depth 3, WPP on | 16.601 ms ready; 174.89 FPS batch throughput |
+| Controlled VP9 Profile 0 1080p60 | Depth 1, decode-only | 5.533 ms steady decode; 173.09 FPS batch throughput |
 
 The 0.333 ms depth-three figure is API submission occupancy, not decode
 latency. See [Benchmarks and measurement method](docs/benchmarks.md) for the

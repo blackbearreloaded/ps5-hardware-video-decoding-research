@@ -76,6 +76,10 @@ create, reset, decode, delete, and queue release all succeeded. Decode accepted
 the access unit and returned one valid, error-free VP9 picture at 1920x1080,
 with 2048-byte pitch and exact caller-pool pointer identity. No flush was needed.
 
+A second control decoded 60 frames at the same resolution, profile, resource,
+and depth. All frames were accepted and valid with exact pointer identity. The
+59 post-cold calls averaged 5.533 ms and the unpaced batch sustained 173.09 FPS.
+
 ## Confidence labels
 
 - **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
@@ -108,8 +112,8 @@ with 2048-byte pitch and exact caller-pool pointer identity. No flush was needed
 - 1440p/4K Main10, B frames, dynamic HDR transitions, live HDR HUD composition,
   and native 4K HDR scanout remain untested.
 - 1440p and 4K SDR decoded surfaces were scaled into 1920x1080 VideoOut.
-- VP9 Profile 0 has one controlled 1080p decode proof; presentation, sustained
-  benchmarking, Profile 2, 1440p, and 4K remain untested.
+- VP9 Profile 0 has controlled single-frame and 60-frame 1080p decode proofs;
+  presentation, Profile 2, 1440p, and 4K remain untested.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

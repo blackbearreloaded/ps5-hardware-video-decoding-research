@@ -43,6 +43,23 @@ The approximately 2 ms H.264 observation is consistent with these results:
 low-complexity and slice-parallel live streams can be near that value, while a
 high-entropy matched stream can take materially longer.
 
+## Controlled VP9 1080p60
+
+A locally generated 60-frame VP9 Profile 0 `testsrc2` stream was decoded with
+the public game resource at pipeline depth one, without pacing or presentation.
+Every access unit was accepted and returned one valid, error-free 1920x1080
+picture in the caller-owned frame allocation. Decode returned output directly;
+no flushes were required.
+
+| Frames | Encoded bytes | Cold call | Steady average | Steady range | Whole-batch throughput |
+|---:|---:|---:|---:|---:|---:|
+| 60 | 1,854,464 | 19.921 ms | 5.533 ms | 4.892–6.726 ms | 173.09 FPS |
+
+The batch took 346.631 ms and includes compressed-payload copies and loop
+overhead. The steady average excludes the first call. This establishes ample
+headroom for this controlled 1080p60 stream, but it is not a matched codec
+comparison and does not include rendering, display pacing, or network latency.
+
 ## H.264 live slice tuning at 1080p60
 
 All three runs used the same depth-one live architecture. The four-slice
