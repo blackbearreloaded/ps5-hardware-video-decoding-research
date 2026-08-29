@@ -20,7 +20,7 @@ measurement boundary.
 | H.264 and HEVC console runs | Known-good modes, caller-owned surfaces, resolution comparisons, pipeline depth, WPP, and practical 4K60 timing |
 | HDR and Main10 console runs | Required application capability, 10-bit VideoOut, channel packing, BT.2020/PQ conversion, and Main10 surface layout |
 | Bounded AV1 interface review | Firmware-6.02 API/backend conclusion with AVC, HEVC, and VP9 positive controls |
-| Controlled VP9 console run | Profile 0 decoder lifecycle, single-frame output metadata, and caller-owned surface identity |
+| Controlled VP9 console runs | Profile 0 lifecycle, resolution scaling, 4K tile-layout and pipeline controls, and caller-owned surface identity |
 | Decoder/presenter prototype | Zero-copy pointer identity and integer luma/chroma sampling behavior |
 | Real-time streaming prototype | H.264 slice tuning, validated mode table, and live latency telemetry |
 | Application integration controls | AGC reconnect lifecycle, SDR HUD cost, display-owner handoff, source mapping, and inactive-HDR rejection |
@@ -81,6 +81,13 @@ profile, resource, depth, and encoder policy. Every frame was accepted and valid
 with exact pointer identity. Post-cold averages were 5.533, 8.617, and
 17.407 ms; unpaced batch rates were 173.09, 112.69, and 55.57 FPS.
 
+A matched 4K control changed only tile layout. Four tile columns raised
+depth-one throughput from 55.57 to 79.10 FPS with a 0.06% encoded-size increase.
+The exact four-tile bytes were then decoded at depth three: 58 outputs arrived
+during submission, two during drain, and the complete batch sustained
+187.39 FPS. Median submission duration was 4.633 ms; median output-ready
+latency was 15.082 ms and p95 was 21.571 ms.
+
 ## Confidence labels
 
 - **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
@@ -114,8 +121,9 @@ with exact pointer identity. Post-cold averages were 5.533, 8.617, and
   and native 4K HDR scanout remain untested.
 - 1440p and 4K SDR decoded surfaces were scaled into 1920x1080 VideoOut.
 - VP9 Profile 0 has controlled 60-frame decode proofs at 1080p, 1440p, and 4K;
-  presentation, Profile 2, deeper pipelines, and tile-layout tuning remain
-  untested.
+  presentation, Profile 2, pixel-layout validation, and representative live
+  streaming remain untested. The four-tile/depth-three result is one synthetic
+  stream, not a universal encoder or latency policy.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

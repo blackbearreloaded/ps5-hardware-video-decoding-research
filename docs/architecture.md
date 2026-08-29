@@ -101,7 +101,8 @@ Align queried regions and frame slots upward to 16 KiB. A depth-one live
 client uses three rotating AU slots and three rotating frame slots to avoid
 per-frame allocation and provide safe ownership across decode/present. A
 deeper experimental pipeline needs enough distinct slots for all in-flight
-work; the depth-six experiment used six.
+work; the HEVC depth-six experiment used six, while the VP9 depth-three
+experiment conservatively used six.
 
 The frame validation gate must check more than a successful return code:
 
@@ -119,9 +120,11 @@ actually yields an output on the public game path.
 ## Decode and flush behavior
 
 The tested depth-one H.264 streams returned no picture from `Decode` and
-required an immediate `Flush` for every frame. The tested HEVC streams and the
-controlled VP9 keyframe returned valid output directly and required no
-immediate flush. The live rule is:
+required an immediate `Flush` for every frame. The tested HEVC streams and
+controlled depth-one VP9 streams returned valid output directly and required
+no immediate flush. At VP9 depth three, the first two calls filled the pipeline,
+58 calls returned pictures, and the final two pictures required an
+end-of-stream drain. The live rule is:
 
 ```c
 decode(access_unit, frame_slot, &output);

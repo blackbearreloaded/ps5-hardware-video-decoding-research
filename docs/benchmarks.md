@@ -63,8 +63,46 @@ exclude the first call. The 1080p and 1440p controls have ample 60 FPS decode
 headroom. The single-tile, depth-one 4K control falls short at 55.57 FPS.
 
 This is a matched resolution series, not a matched codec comparison. It does
-not include rendering, display pacing, network latency, deeper pipeline
-throughput, or alternative VP9 tile layouts.
+not include rendering, display pacing, or network latency. The next controls
+isolated VP9 tile layout and decoder pipeline depth.
+
+## VP9 4K tile-layout and pipeline controls
+
+The tile-layout control repeated the 4K depth-one run while changing only the
+libvpx tile-column setting. `tile-columns=2` produced four tile columns
+(`tile_cols_log2=2`). Header tracing verified the setting before the console
+run.
+
+| Tile columns | Encoded bytes | Cold call | Steady average | Steady range | Batch duration | Throughput |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 7,283,643 | 51.692 ms | 17.407 ms | 15.164–22.425 ms | 1,079.700 ms | 55.57 FPS |
+| 4 | 7,288,350 | 27.323 ms | 12.376 ms | 10.559–15.601 ms | 758.503 ms | 79.10 FPS |
+
+The tiled asset was only 0.06% larger, while steady decode time fell 28.90%
+and throughput rose 42.34%. This establishes a material tile-parallel benefit
+for the tested stream; it is not a universal optimum for every VP9 encoder,
+resolution, or content type.
+
+The pipeline control then reused the exact four-tile bytes and changed only
+decoder depth from one to three. The depth-three harness kept distinct bounded
+input/frame slots, accepted output-free fill calls, correlated FIFO output to
+submission timestamps, and drained the final outputs.
+
+| Depth | Output split | Submission average / median | Ready average / median / p95 | Complete span | Throughput |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 60 decode / 0 drain | 12.376 ms steady average | synchronous; not separately timestamped | 758.503 ms | 79.10 FPS |
+| 3 | 58 decode / 2 drain | 5.185 / 4.633 ms | 15.844 / 15.082 / 21.571 ms | 320.172 ms | 187.39 FPS |
+
+Maximum pending depth was three. All 60 access units and frame buffers were
+accepted; all outputs passed codec, geometry, error, picture-count, and
+caller-pool validation. Depth three reduced complete batch time by 57.79% and
+raised throughput by 136.90%. The result also demonstrates why a fast
+submission return is not the same as low output-ready latency.
+
+These are single, unpaced, decode-only runs of synthetic content. The
+depth-three ready maximum was 38.205 ms, and its p95 exceeded one 60 Hz frame
+interval. Product policy must therefore balance throughput against residency
+using representative live streams and callback-to-present measurements.
 
 ## H.264 live slice tuning at 1080p60
 

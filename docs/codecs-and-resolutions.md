@@ -101,8 +101,15 @@ pitch and byte pitch both 2048.
 Matched 60-frame decode-only controls averaged 5.533 ms at 1080p, 8.617 ms at
 1440p, and 17.407 ms at 4K after excluding each cold frame. Batch throughput
 was 173.09, 112.69, and 55.57 FPS. The single-tile depth-one 4K stream therefore
-decoded successfully but did not sustain 60 FPS. Profile 2, deeper pipeline
-throughput, alternative tile layouts, pixel-layout validation, and VP9
+decoded successfully but did not sustain 60 FPS.
+
+A matched 4K tile control changed only the stream from one tile column to four.
+Encoded size increased 0.06%, while depth-one throughput rose to 79.10 FPS and
+steady decode time fell to 12.376 ms. Reusing those exact four-tile bytes at
+pipeline depth three produced 58 outputs during 60 submissions, drained the
+final two, and sustained 187.39 FPS across the complete batch. Median
+submission time was 4.633 ms; median output-ready latency was 15.082 ms with a
+21.571 ms p95. Profile 2, pixel-layout validation, live VP9 behavior, and VP9
 presentation remain untested.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable

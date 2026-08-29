@@ -10,7 +10,8 @@ measurement on PlayStation 5.
 
 The public game-process `libSceVideodec2` path decodes H.264 High and HEVC Main
 at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. Controlled runs
-also prove VP9 Profile 0 decode at those resolutions to caller-owned direct memory.
+also prove VP9 Profile 0 decode at those resolutions, including tiled 4K and a
+correctly drained depth-three pipeline, to caller-owned direct memory.
 AGC consumes the exact returned pointer for the validated AVC/HEVC presentation
 paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
 proves HEVC Main10 decode through public HDR VideoOut.
@@ -30,7 +31,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 Profile 0 | Controlled decode: 173.09 FPS at 1080p, 112.69 at 1440p, and 55.57 at 4K; presentation untested |
+| VP9 Profile 0 | Controlled decode at 1080p, 1440p, and 4K; four-tile 4K reached 79.10 FPS at depth one and 187.39 at depth three; presentation untested |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
 | CI | Builds and runs the host-side contract examples |
@@ -49,6 +50,7 @@ and untested claims separate.
 | HEVC practical 4K60 | Depth one averaged 5.464 ms decode and 16.698 ms callback-to-completed-flip |
 | HEVC WPP | Controlled depth-three 4K throughput improved 36.2% |
 | Pipeline depth | More frames in flight improve throughput but increase frame residency |
+| VP9 4K tiling | Four tile columns improved depth-one throughput from 55.57 to 79.10 FPS with only 0.06% more encoded data |
 | Main10 storage | Two-plane 4:2:0 with low-aligned 10-bit words, not MSB-aligned P010 |
 | HDR output | BT.2020-NCL conversion preserves PQ into A2B10G10R10 VideoOut |
 | Reconnect lifecycle | AGC initialization is process-global; retain it while rebuilding per-stream resources |
@@ -104,7 +106,9 @@ must match before comparing platforms.
 | Controlled HEVC 4K | Depth 3, WPP on | 16.601 ms ready; 174.89 FPS batch throughput |
 | Controlled VP9 Profile 0 1080p60 | Depth 1, decode-only | 5.533 ms steady decode; 173.09 FPS batch throughput |
 | Controlled VP9 Profile 0 1440p60 | Depth 1, decode-only | 8.617 ms steady decode; 112.69 FPS batch throughput |
-| Controlled VP9 Profile 0 4K60 source | Depth 1, decode-only | 17.407 ms steady decode; 55.57 FPS batch throughput |
+| Controlled VP9 Profile 0 4K60 source | Single tile, depth 1, decode-only | 17.407 ms steady decode; 55.57 FPS batch throughput |
+| Controlled VP9 Profile 0 4K60 source | Four tiles, depth 1, decode-only | 12.376 ms steady decode; 79.10 FPS batch throughput |
+| Same four-tile VP9 bytes | Depth 3, decode-only | 4.633 ms median submission; 15.082 ms median ready; 187.39 FPS batch throughput |
 
 The 0.333 ms depth-three figure is API submission occupancy, not decode
 latency. See [Benchmarks and measurement method](docs/benchmarks.md) for the
@@ -140,10 +144,12 @@ See [Minimal examples](examples/README.md) for the use-case mapping.
    fixed compressed-input and caller-owned frame pools.
 3. Request four H.264 slices at 1080p; measure other counts per resolution.
 4. Request HEVC WPP and verify the PPS instead of assuming it is enabled.
-5. Preserve coded dimensions separately from visible crop, particularly
+5. Request four VP9 tile columns for the tested 4K encoder policy, then verify
+   the bitstream and measure representative live content.
+6. Preserve coded dimensions separately from visible crop, particularly
    3840x2176 coded versus 3840x2160 visible.
-6. Keep H.264, HEVC Main, and Main10/HDR as explicit negotiated modes.
-7. Measure submission, output-ready, throughput, and completed-flip boundaries
+7. Keep H.264, HEVC Main, and Main10/HDR as explicit negotiated modes.
+8. Measure submission, output-ready, throughput, and completed-flip boundaries
    separately.
 
 ## Documentation
@@ -195,7 +201,7 @@ Evidence labels are intentionally narrow:
 
 | Project or reference | Role |
 | --- | --- |
-| [FFmpeg](https://ffmpeg.org/) | Controlled H.264/HEVC asset generation and bitstream inspection |
+| [FFmpeg](https://ffmpeg.org/) | Controlled H.264/HEVC/VP9 asset generation and bitstream inspection |
 | [x265](https://bitbucket.org/multicoreware/x265_git/wiki/Home) | HEVC encoder used for controlled WPP comparisons |
 | [Sony PS5 specifications](https://blog.playstation.com/archive/2020/03/18/unveiling-new-details-of-playstation-5-hardware-technical-specs/) | Public GPU, memory, and VideoOut context |
 | [AMD video formats](https://www.amd.com/en/products/graphics/radeon-for-creators/video-editing.html) | Evidence that RDNA-family products do not share one universal codec matrix |
