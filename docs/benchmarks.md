@@ -323,5 +323,5 @@ Record these fields with every result:
 - output validity, error state, and caller-pool pointer identity; and
 - whether the run is controlled synthetic content or practical live content.
 
-The small [timing example](../examples/timing_model.cpp) shows the definitions
+The small [timing example](../examples/common/timing_model.cpp) shows the definitions
 without depending on PS5 headers.

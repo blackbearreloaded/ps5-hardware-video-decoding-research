@@ -101,7 +101,7 @@ The public output format consumes packed words as:
 +-------------+---------------------+---------------------+-------------+
 ```
 
-The [HDR contract example](../examples/hdr_contract.cpp) validates that packing
+The [HDR contract example](../examples/hdr/surface_contract.cpp) validates that packing
 and the Main10 plane calculation on a normal desktop compiler.
 
 Create the Y and UV texture descriptors from the runtime addresses, component

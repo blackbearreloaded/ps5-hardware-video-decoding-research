@@ -8,8 +8,9 @@ visible crop, and surface type belong to the mode. Do not build separate H.264
 and HEVC subsystems, and do not let an unexpected negotiated format silently
 fall through.
 
-The [mode example](../examples/video_modes.cpp) implements this idea without any
-PS5 dependency.
+The codec-specific [H.264](../examples/h264/modes.cpp),
+[HEVC](../examples/hevc/modes.cpp), and [VP9](../examples/vp9/modes.cpp) mode
+examples implement this idea without any PS5 dependency.
 
 ## Session setup
 
@@ -137,7 +138,7 @@ and `show_existing_frame` state beside each queued timestamp:
   caller-owned output; and
 - correlate output to queued coded frames, not container packets.
 
-The [C++20 packetization example](../examples/vp9_packetization.cpp) implements
+The [C++20 packetization example](../examples/vp9/packetization.cpp) implements
 the superframe-index split and display decision without platform dependencies.
 
 ## Presentation selection

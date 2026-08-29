@@ -142,16 +142,18 @@ git clone git@github.com:blackbearreloaded/ps5-hardware-video-decoding-research.
 cd ps5-hardware-video-decoding-research
 
 mkdir -p build
-c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/video_modes.cpp -o build/video_modes
-c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr_contract.cpp -o build/hdr_contract
-c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/timing_model.cpp -o build/timing_model
-c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9_packetization.cpp -o build/vp9_packetization
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/h264/modes.cpp -o build/h264_modes
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hevc/modes.cpp -o build/hevc_modes
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/modes.cpp -o build/vp9_modes
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/packetization.cpp -o build/vp9_packetization
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr/surface_contract.cpp -o build/hdr_surface_contract
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/timing_model.cpp -o build/timing_model
 
-./build/video_modes h264 1080
-./build/video_modes hevc 2160
-./build/video_modes main10 1080
-./build/video_modes vp9p2 2160
-./build/hdr_contract
+./build/h264_modes high 1080
+./build/hevc_modes main 2160
+./build/hevc_modes main10 1080
+./build/vp9_modes profile2 2160
+./build/hdr_surface_contract
 ./build/timing_model
 ./build/vp9_packetization
 ```
@@ -200,10 +202,13 @@ docs/benchmarks.md                Complete controlled and live measurements
 docs/hdr.md                       HEVC/VP9 10-bit and HDR presentation contract
 docs/implementation.md            Real-time streaming integration guidance
 docs/evidence.md                  Evidence lineage and research limits
-examples/video_modes.cpp          Codec/resolution mode selection
-examples/hdr_contract.cpp         HEVC/VP9 10-bit layouts, color matrix, and packing
-examples/timing_model.cpp         Submission, ready, and flip timing semantics
-examples/vp9_packetization.cpp    Superframe splitting and hidden/show-existing policy
+examples/h264/modes.cpp            H.264 mode and surface selection
+examples/hevc/modes.cpp            HEVC Main/Main10 mode and surface selection
+examples/vp9/modes.cpp             VP9 Profile 0/2 mode and surface selection
+examples/vp9/packetization.cpp     Superframe and presentation policy
+examples/hdr/surface_contract.cpp  10-bit layouts, color matrix, and packing
+examples/common/timing_model.cpp   Submission, ready, and flip timing semantics
+examples/common/video_mode.hpp     Shared mode validation and reporting
 .github/workflows/examples.yml    Strict C++20 example validation
 PUBLICATION.md                    Publication and contribution boundary
 ```

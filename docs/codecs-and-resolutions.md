@@ -145,7 +145,7 @@ standard superframe index was split. Hidden alternate-reference frames still
 produced decoder outputs and must be submitted while presentation is
 suppressed. A show-existing-frame command produced a valid output in the newly
 supplied caller frame slot rather than returning the older reference pointer.
-See the [packetization example](../examples/vp9_packetization.cpp).
+See the [packetization example](../examples/vp9/packetization.cpp).
 
 Malformed input returned a decoder error, after which reset recovered on a
 known-good keyframe without recreating the process. The same decoder also

@@ -27,19 +27,24 @@ jobs:
       - name: Build examples
         run: |
           mkdir -p build
-          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/video_modes.cpp -o build/video_modes
-          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr_contract.cpp -o build/hdr_contract
-          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/timing_model.cpp -o build/timing_model
-          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9_packetization.cpp -o build/vp9_packetization
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/h264/modes.cpp -o build/h264_modes
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hevc/modes.cpp -o build/hevc_modes
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/modes.cpp -o build/vp9_modes
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9/packetization.cpp -o build/vp9_packetization
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr/surface_contract.cpp -o build/hdr_surface_contract
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/common/timing_model.cpp -o build/timing_model
       - name: Run contract checks
         run: |
-          ./build/video_modes h264 1080
-          ./build/video_modes hevc 2160
-          ./build/video_modes vp9 1080
-          ./build/video_modes vp9 2160
-          ./build/video_modes vp9p2 2160
-          ./build/video_modes main10 1080
-          ! ./build/video_modes hevc invalid
-          ./build/hdr_contract
+          ./build/h264_modes high 1080
+          ./build/h264_modes high 1440
+          ./build/h264_modes high 2160
+          ./build/hevc_modes main 2160
+          ./build/hevc_modes main10 1080
+          ./build/vp9_modes profile0 1080
+          ./build/vp9_modes profile0 2160
+          ./build/vp9_modes profile2 2160
+          ! ./build/hevc_modes main invalid
+          ! ./build/vp9_modes profile2 1440
+          ./build/hdr_surface_contract
           ./build/timing_model
           ./build/vp9_packetization

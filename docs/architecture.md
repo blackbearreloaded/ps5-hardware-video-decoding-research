@@ -87,7 +87,7 @@ packet was split. Submit hidden alternate-reference frames even though they
 must not be presented. Submit show-existing-frame commands as coded inputs too;
 the tested API materialized the referenced picture into the newly supplied
 caller-owned frame slot. See the host-side
-[packetization example](../examples/vp9_packetization.cpp).
+[packetization example](../examples/vp9/packetization.cpp).
 
 ## Memory contract
 
