@@ -44,8 +44,10 @@ remain outside the publication.
 | Practical 4K60 | Live HEVC at depths 3 and 1 |
 | Slice controls | H.264 1080p60 four-slice optimization and eight-slice comparison |
 | Reconnect control | AGC initialization is process-global; per-stream resources can still be rebuilt |
+| Process-boundary control | Decoder-to-AGC pointer identity was proven in one process; raw direct-memory offsets did not act as cross-process handles |
+| Flip-count control | Removing a redundant second VideoOut flip restored cadence from 29.97 to 59.93 FPS |
 | HUD control | Small SDR overlay in the existing AGC submission preserved the measured latency class |
-| Display handoff control | Valid decode/AGC markers can coexist with black output when VideoOut ownership transition fails |
+| Display handoff control | Valid decode/AGC markers and even a completed background flip can coexist with invisible output when foreground ownership is elsewhere |
 | Full-frame mapping diagnosis | Inherited partial-view affine transform cropped valid pixels; a complete affine and destination safe-area control restored the full chart |
 | Raw-buffer shader audit | Current Y/UV fetches use integer point sampling; filtered scale remains untested |
 

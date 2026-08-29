@@ -48,6 +48,7 @@ and untested claims separate.
 | Finding | Result |
 | --- | --- |
 | Shared-memory optimization | Videodec2 and AGC use the same caller-owned direct-memory surface |
+| Zero-copy process boundary | Exact-pointer reuse is proven within one process; a raw direct-memory offset is not a portable cross-process handle |
 | Per-frame CPU copy | Only the compressed access-unit gather remains; measured at roughly 1–5 us |
 | H.264 1080p optimization | Four slices reduced average Videodec2 time from 4.761 ms to 2.268 ms |
 | HEVC practical 4K60 | Depth one averaged 5.464 ms decode and 16.698 ms callback-to-completed-flip |
@@ -62,6 +63,8 @@ and untested claims separate.
 | 10-bit storage | HEVC Main10 and VP9 Profile 2 use two-plane 4:2:0 with low-aligned words, not MSB-aligned P010 |
 | HDR output | BT.2020-NCL conversion preserves PQ into A2B10G10R10 VideoOut |
 | Reconnect lifecycle | AGC initialization is process-global; retain it while rebuilding per-stream resources |
+| Flip ownership | Use AGC's integrated flip once; a redundant second flip reduced a controlled 60 FPS path to about 30 FPS |
+| Foreground ownership | A successful background flip did not transfer compositor visibility to that process |
 | In-band SDR HUD | One extra draw in the existing AGC command buffer caused no meaningful measured latency regression |
 | Source mapping | An inherited partial-view transform cropped valid pixels; restoring the complete affine and destination safe-area state passed a controlled full-frame acceptance |
 | Sampling quality | The current raw-buffer shader point-samples luma/chroma; filtered downscaling remains untested |

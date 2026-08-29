@@ -227,6 +227,11 @@ callback-to-flip difference is smaller than these single-run experiments can
 attribute confidently; this is evidence that the design preserved the latency
 class, not a claim that the extra draw costs exactly 0.005 ms.
 
+An earlier 90-frame presentation control submitted AGC's integrated flip and
+then issued another explicit VideoOut flip. It sustained 29.97 FPS. Removing
+only the second flip restored 59.93 FPS with the same decoder-to-AGC pointer
+identity. The extra flip was display pacing overhead, not decoder cost.
+
 A separate reconnect test confirmed that AGC must be initialized once per
 process. After retaining the initial state, two consecutive sessions presented
 909/909 and 553/553 frames at 13.515 ms and 13.502 ms average

@@ -166,6 +166,12 @@ callback thread.
 ## Presenter ownership and mapping
 
 Only one renderer should own VideoOut/AGC presentation during a transition.
+Keep the zero-copy decoder and presenter in the same process; do not pass a raw
+direct-memory offset to another process and treat it as a transferable handle.
+When the AGC command includes the display flip, do not submit a second explicit
+flip. Wait on the integrated flip's completion marker before releasing the
+decoded slot.
+
 Fully stop a launcher or loading renderer before opening the stream presenter,
 and join any animation worker before the first decoded frame or failed-setup
 teardown. A bounded 100 ms post-launcher settle removed an observed intermittent

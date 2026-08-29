@@ -131,6 +131,10 @@ frame CPU copy:
 “Zero-copy” therefore describes only the decoder-to-AGC boundary. It does not
 mean zero memory traffic, direct socket-to-decoder input, or decoder output used
 as the scanout framebuffer. The compressed gather and final GPU render remain.
+The exact-pointer proof is also same-process: a raw direct-memory offset from
+one process was not a usable mapping handle in another process. Keep the
+decoder and presenter in one process unless a separately documented,
+authorized inter-process sharing mechanism is available and validated.
 
 The slot ownership sequence is:
 
@@ -220,6 +224,12 @@ marker. Reported presentation and callback-to-flip timing therefore includes
 AGC work plus display pacing. `sceAgcSuspendPoint()` is a required lifecycle
 boundary after GPU submission, and shutdown must drain pending flips/vblank.
 
+The tested AGC command already included the display flip. An early 90-frame
+control also issued a second explicit flip and sustained only 29.97 FPS because
+each frame waited through two display intervals. Removing only that redundant
+flip restored 59.93 FPS. Submit exactly one flip for each presented frame and
+use its completion marker as the frame-slot release fence.
+
 ## Network and pipeline ownership
 
 Keep socket receive independent of decode and blocking completed-flip
@@ -255,6 +265,12 @@ VideoOut handoff. A bounded 100 ms settle after closing the previous renderer
 was followed by four visible 60 FPS stream cycles with about 2.29 ms average
 decode and 16.7 ms callback-to-flip latency. This supports a handoff race and a
 practical mitigation; it does not prove that 100 ms is a universal API rule.
+
+A separate control completed a background VideoOut flip successfully while the
+previous foreground application remained visible. A successful flip proves GPU
+and VideoOut completion; it does not grant foreground compositor ownership.
+Establish the intended foreground owner before treating a completed flip as
+visible presentation evidence.
 
 Pre-stream animations or loading frames must obey the same ownership rule.
 Stop and join their worker before the first decoder frame uses AGC or a shared
