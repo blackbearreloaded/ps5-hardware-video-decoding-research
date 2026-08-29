@@ -144,10 +144,11 @@ plane followed by interleaved UV, using returned pitch and coded height. For
 Main10, each component occupies a 16-bit word but the ten meaningful bits are
 low-aligned. See [HDR and Main10](hdr.md).
 
-The VP9 Profile 0 control returned format `0`, a 2048-byte pitch, and the exact
-caller-owned frame address for a 1920x1080 picture. Its pixel content and
-presentation layout have not yet been independently validated, so do not
-promote the AVC/HEVC NV12 interpretation to a VP9 guarantee yet.
+The VP9 Profile 0 controls returned format `0` and exact caller-owned frame
+addresses. Returned pitch was 2048 bytes at 1920x1080, 2560 at 2560x1440, and
+3840 at 3840x2160. Pixel content and presentation layout have not yet been
+independently validated, so do not promote the AVC/HEVC NV12 interpretation to
+a VP9 guarantee yet.
 
 AGC uses coded height to locate the chroma plane and visible dimensions to crop
 or scale. This distinction is required for the proven live 4K layout:

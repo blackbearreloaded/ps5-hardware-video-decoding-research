@@ -43,22 +43,28 @@ The approximately 2 ms H.264 observation is consistent with these results:
 low-complexity and slice-parallel live streams can be near that value, while a
 high-entropy matched stream can take materially longer.
 
-## Controlled VP9 1080p60
+## Controlled VP9 resolution scaling
 
-A locally generated 60-frame VP9 Profile 0 `testsrc2` stream was decoded with
-the public game resource at pipeline depth one, without pacing or presentation.
-Every access unit was accepted and returned one valid, error-free 1920x1080
-picture in the caller-owned frame allocation. Decode returned output directly;
-no flushes were required.
+A matched series of locally generated 60-frame VP9 Profile 0 `testsrc2` streams
+was decoded with the public game resource at pipeline depth one, without pacing
+or presentation. Every access unit was accepted and returned one valid,
+error-free picture in the caller-owned frame allocation. Decode returned output
+directly; no flushes were required.
 
-| Frames | Encoded bytes | Cold call | Steady average | Steady range | Whole-batch throughput |
+| Resolution | Encoded bytes | Cold call | Steady average | Steady range | Whole-batch throughput |
 |---:|---:|---:|---:|---:|---:|
-| 60 | 1,854,464 | 19.921 ms | 5.533 ms | 4.892–6.726 ms | 173.09 FPS |
+| 1920x1080 | 1,854,464 | 19.921 ms | 5.533 ms | 4.892–6.726 ms | 173.09 FPS |
+| 2560x1440 | 3,207,727 | 23.625 ms | 8.617 ms | 7.467–11.870 ms | 112.69 FPS |
+| 3840x2160 | 7,283,643 | 51.692 ms | 17.407 ms | 15.164–22.425 ms | 55.57 FPS |
 
-The batch took 346.631 ms and includes compressed-payload copies and loop
-overhead. The steady average excludes the first call. This establishes ample
-headroom for this controlled 1080p60 stream, but it is not a matched codec
-comparison and does not include rendering, display pacing, or network latency.
+Batch durations were 346.631 ms, 532.401 ms, and 1,079.700 ms respectively.
+They include compressed-payload copies and loop overhead; steady averages
+exclude the first call. The 1080p and 1440p controls have ample 60 FPS decode
+headroom. The single-tile, depth-one 4K control falls short at 55.57 FPS.
+
+This is a matched resolution series, not a matched codec comparison. It does
+not include rendering, display pacing, network latency, deeper pipeline
+throughput, or alternative VP9 tile layouts.
 
 ## H.264 live slice tuning at 1080p60
 

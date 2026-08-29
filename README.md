@@ -9,8 +9,8 @@ HEVC, VP9, Main10/HDR, resolution scaling, zero-copy presentation, and performan
 measurement on PlayStation 5.
 
 The public game-process `libSceVideodec2` path decodes H.264 High and HEVC Main
-at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. A controlled
-1080p keyframe also proves VP9 Profile 0 decode to caller-owned direct memory.
+at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. Controlled runs
+also prove VP9 Profile 0 decode at those resolutions to caller-owned direct memory.
 AGC consumes the exact returned pointer for the validated AVC/HEVC presentation
 paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
 proves HEVC Main10 decode through public HDR VideoOut.
@@ -30,7 +30,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 Profile 0 | Controlled 1080p60 decode sustained 173.09 FPS; presentation untested |
+| VP9 Profile 0 | Controlled decode: 173.09 FPS at 1080p, 112.69 at 1440p, and 55.57 at 4K; presentation untested |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
 | CI | Builds and runs the host-side contract examples |
@@ -81,7 +81,7 @@ renders the surface into a scanout framebuffer.
 | H.265 / HEVC Main | Console-proven | 8-bit 4:2:0 at 1080p, 1440p, and 2160p |
 | H.265 / HEVC Main10 | Controlled console proof | 1920x1080 BT.2020/PQ frame and caller-owned 10-bit surface |
 | HDR10 presentation | Controlled console proof | Main10 -> AGC BT.2020-NCL -> 10-bit HDR VideoOut |
-| VP9 Profile 0 | Controlled console proof | One 1920x1080 keyframe; caller-owned direct-memory output |
+| VP9 Profile 0 | Controlled console proof | 8-bit 4:2:0 at 1080p, 1440p, and 2160p; caller-owned direct-memory output |
 | AV1 | Unavailable through examined APIs | No usable decoder route was identified |
 | Native 4K scanout | Not proven | Current 4K tests scale into a 1920x1080 display target |
 
@@ -103,6 +103,8 @@ must match before comparing platforms.
 | Same controlled bytes | Depth 3, WPP off | 22.993 ms ready; 128.39 FPS batch throughput |
 | Controlled HEVC 4K | Depth 3, WPP on | 16.601 ms ready; 174.89 FPS batch throughput |
 | Controlled VP9 Profile 0 1080p60 | Depth 1, decode-only | 5.533 ms steady decode; 173.09 FPS batch throughput |
+| Controlled VP9 Profile 0 1440p60 | Depth 1, decode-only | 8.617 ms steady decode; 112.69 FPS batch throughput |
+| Controlled VP9 Profile 0 4K60 source | Depth 1, decode-only | 17.407 ms steady decode; 55.57 FPS batch throughput |
 
 The 0.333 ms depth-three figure is API submission occupancy, not decode
 latency. See [Benchmarks and measurement method](docs/benchmarks.md) for the

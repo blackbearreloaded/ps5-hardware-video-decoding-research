@@ -20,6 +20,8 @@ a lower level than the configured maximum.
 | HEVC Main 2160p | Main | 5.1 | 3840x2176 | 3840x2160 or 2176 | 3840x2160 | 3840 bytes |
 | HEVC Main10 1080p | Main10 | 4.1 | 1920x1088 | 1920x1088 | 1920x1080 | 1920 components / 3840 bytes |
 | VP9 1080p | Profile 0 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 2048 bytes |
+| VP9 1440p | Profile 0 | 5.0 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
+| VP9 2160p | Profile 0 | 5.1 | 3840x2160 | 3840x2160 | 3840x2160 | 3840 bytes |
 
 The console-validated AVC/HEVC 8-bit modes return NV12. The Main10 mode returns
 a two-plane 4:2:0 surface with low-aligned 10-bit values in 16-bit words. The
@@ -96,10 +98,12 @@ Profile 0 keyframe, and return one valid, error-free 1920x1080 picture in the
 caller-owned direct-memory frame allocation. The returned codec was VP9, with
 pitch and byte pitch both 2048.
 
-The follow-on 60-frame decode-only control averaged 5.533 ms after the cold
-frame and completed at 173.09 FPS. It proves sustained headroom for that exact
-1080p stream, not a live or matched-codec performance result. Profile 2, 1440p,
-4K, pixel-layout validation, and VP9 presentation remain untested.
+Matched 60-frame decode-only controls averaged 5.533 ms at 1080p, 8.617 ms at
+1440p, and 17.407 ms at 4K after excluding each cold frame. Batch throughput
+was 173.09, 112.69, and 55.57 FPS. The single-tile depth-one 4K stream therefore
+decoded successfully but did not sustain 60 FPS. Profile 2, deeper pipeline
+throughput, alternative tile layouts, pixel-layout validation, and VP9
+presentation remain untested.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable
 decoder backend was found on firmware 6.02. A protocol layer may be

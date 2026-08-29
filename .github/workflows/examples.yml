@@ -35,6 +35,7 @@ jobs:
           ./build/video_modes h264 1080
           ./build/video_modes hevc 2160
           ./build/video_modes vp9 1080
+          ./build/video_modes vp9 2160
           ./build/video_modes main10 1080
           ! ./build/video_modes hevc invalid
           ./build/hdr_contract

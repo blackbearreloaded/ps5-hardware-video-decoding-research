@@ -36,7 +36,7 @@ On Windows, use the same commands from a Clang Developer PowerShell and add
 | Select H.264 High at 1080p, 1440p, or 4K | `video_modes.cpp h264 <height>` |
 | Select HEVC Main at 1080p, 1440p, or 4K | `video_modes.cpp hevc <height>` |
 | Select the proven HEVC Main10 tuple | `video_modes.cpp main10 1080` |
-| Select the controlled VP9 Profile 0 tuple | `video_modes.cpp vp9 1080` |
+| Select VP9 Profile 0 at 1080p, 1440p, or 4K | `video_modes.cpp vp9 <height>` |
 | Preserve maximum, coded, visible, and pitch dimensions | `video_modes.cpp` |
 | Calculate the Main10 Y/UV plane layout | `hdr_contract.cpp` |
 | Pack the public 10-bit VideoOut word | `hdr_contract.cpp` |
