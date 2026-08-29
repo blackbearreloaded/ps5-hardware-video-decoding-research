@@ -20,8 +20,8 @@ jobs:
             printf 'Prohibited tracked artifacts:\n%s\n' "$tracked_artifacts"
             exit 1
           fi
-          if git grep -n -I -E '[A-Z]{4}[0-9]{5}|[0-9a-f]{40}' -- . ':!LICENSE'; then
-            echo 'Remove title-specific identifiers or private snapshot hashes.'
+          if git grep -n -I -E '[A-Z]{4}[0-9]{5}|[0-9a-fA-F]{40}|([0-9]{1,3}\.){3}[0-9]{1,3}' -- . ':!LICENSE'; then
+            echo 'Remove title identifiers, private hashes, or laboratory addresses.'
             exit 1
           fi
       - name: Build examples
@@ -30,13 +30,16 @@ jobs:
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/video_modes.cpp -o build/video_modes
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr_contract.cpp -o build/hdr_contract
           c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/timing_model.cpp -o build/timing_model
+          c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9_packetization.cpp -o build/vp9_packetization
       - name: Run contract checks
         run: |
           ./build/video_modes h264 1080
           ./build/video_modes hevc 2160
           ./build/video_modes vp9 1080
           ./build/video_modes vp9 2160
+          ./build/video_modes vp9p2 2160
           ./build/video_modes main10 1080
           ! ./build/video_modes hevc invalid
           ./build/hdr_contract
           ./build/timing_model
+          ./build/vp9_packetization

@@ -1,6 +1,6 @@
-# HEVC Main10 and HDR10
+# 10-bit decoded surfaces and HDR10
 
-## Proven 1080p end-to-end contract
+## Proven HEVC Main10 1080p end-to-end contract
 
 A normal game-category process can decode a controlled HEVC Main10 BT.2020/PQ
 frame into caller-owned direct memory, bind that exact pointer in AGC, convert
@@ -37,16 +37,35 @@ frequent use of bits 5:0 and essentially no image samples in bits 15:10.
 
 Use returned component pitch and coded height:
 
-```c
-y_bytes   = pitch_components * coded_height * 2;
-uv_base   = base + y_bytes;
-total_raw = pitch_components * coded_height * 3;
-slot_size = align_up(total_raw, 16 * 1024);
+```cpp
+const auto y_bytes = pitch_components * coded_height * std::size_t{2};
+const auto uv_base = base + y_bytes;
+const auto total_raw = pitch_components * coded_height * std::size_t{3};
+const auto slot_size = align_up(total_raw, std::size_t{16} * 1024);
 ```
 
 For 1920x1088 this calculation, rounded to 16 KiB, exactly matched the decoder's
 runtime-queried frame allocation. The returned format field alone did not
 distinguish bit depth.
+
+## VP9 Profile 2 contract
+
+VP9 Profile 2 uses the same observed low-aligned 10-bit two-plane storage
+family. The tested 1080p surface used 1920 component pitch / 3840 byte pitch;
+the tested 4K surface used 3840 / 7680. Both were exact members of the
+application's caller-owned frame pool.
+
+A four-tile 4K Profile 2 stream decoded at 72.37 FPS at depth one and 170.51
+FPS at depth three. The three-slot depth-three pipeline then presented all 60
+decoded surfaces through the 10-bit HDR target at 59.53 FPS paced cadence.
+Every output reached a completed flip, but the automated remote capture did not
+provide new pixel-level evidence for that 4K run. Treat storage, pointer
+identity, and completed presentation as proven; retain the earlier controlled
+HDR chart as the color-path validation.
+
+Profile 2 is not itself proof that content is HDR. Select BT.2020/PQ rendering
+only when the stream independently signals the required color primaries,
+matrix, range, and transfer function.
 
 ## Color conversion
 
@@ -152,8 +171,9 @@ readback coordinate.
 - decode and end-to-end latency percentiles under that workload;
 - host HDR on/off transitions and SDR fallback;
 - live HDR-qualified UI/HUD composition;
-- 1440p and 4K Main10 decoder tuples and texture descriptors;
-- native 1440p/4K HDR VideoOut scanout and memory pressure; and
+- 1440p and 4K HEVC Main10 decoder tuples and texture descriptors;
+- representative live VP9 Profile 2 HDR content and latency percentiles;
+- native 1440p/4K hardware-decoder-to-scanout integration and memory pressure;
 - display-side photometric and metadata verification.
 
 Do not expose larger Main10 modes by extrapolating the 1080p result.

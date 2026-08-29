@@ -22,13 +22,15 @@ a lower level than the configured maximum.
 | VP9 1080p | Profile 0 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 2048 bytes |
 | VP9 1440p | Profile 0 | 5.0 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
 | VP9 2160p | Profile 0 | 5.1 | 3840x2160 | 3840x2160 | 3840x2160 | 3840 bytes |
+| VP9 1080p | Profile 2 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 1920 components / 3840 bytes |
+| VP9 2160p | Profile 2 | 5.1 | 3840x2160 | 3840x2160 | 3840x2160 | 3840 components / 7680 bytes |
 
 The console-validated AVC/HEVC 8-bit modes return NV12. The Main10 mode returns
 a two-plane 4:2:0 surface with low-aligned 10-bit values in 16-bit words. The
 returned format field did not distinguish the tested 8-bit and 10-bit paths,
 so negotiation, byte pitch, dimensions, and buffer size must select the texture
-interpretation. A controlled 4K VP9 presentation validated the tested linear
-8-bit two-plane interpretation.
+interpretation. Controlled VP9 presentation validated both the 8-bit Profile 0
+and low-aligned 10-bit Profile 2 two-plane paths.
 
 ## Resolution-specific observations
 
@@ -68,8 +70,12 @@ negotiated visible crop:   3840 x 2160
 display target:            independently selected (1920 x 1080 in these runs)
 ```
 
-The practical HEVC stream proved 4K60 decode and scaled presentation. It did
-not prove native 4K VideoOut registration, scanout, or Main10 HDR at 4K.
+The practical HEVC stream proved 4K60 decode and scaled presentation. A separate
+full-player control proved standard native 3840x2160 VideoOut and about 59.9 FPS
+HDR presentation, but used software decoding; keep that scanout evidence
+separate from Videodec2 performance. The hardware VP9 Profile 2 pipeline also
+completed 4K decode and HDR-target presentation, without new pixel-level HDR
+capture evidence.
 
 ## Codec selection guidance
 
@@ -117,8 +123,35 @@ exact-pointer presentation. Frames 1 through 59 averaged 12.311 ms from
 submission to output ready and 16.676 ms from AU ready to completed flip,
 sustaining 59.95 FPS. A controlled chart showed the complete frame, expected
 color order, and fine-detail regions. This validates the tested 8-bit
-two-plane presentation path; Profile 2 and representative live VP9 behavior
-remain untested.
+two-plane presentation path.
+
+Profile 2 was then proven separately at 1080p and 4K. Active samples occupied
+low-aligned ten-bit words, not conventional MSB-aligned P010. The four-tile 4K
+stream reached 72.37 FPS at depth one and 170.51 FPS at depth three, with the
+same 58-submit/two-drain behavior. A three-slot depth-three pipeline presented
+all 60 outputs through a 10-bit HDR target at 59.53 FPS paced cadence. Average
+submission was 0.401 ms and AU-ready-to-completed-flip pipeline latency was
+40.483 ms; these are distinct measurements.
+
+A natural-content Profile 0 control ran three identical 60-frame passes at
+288.71, 278.44, and 287.01 FPS (287.01 FPS median). Its ten-minute paced
+extension processed 36,000 4K60 frames with no full-frame deadline misses and
+0.326/1.068 ms average/maximum submission occupancy. These results apply only
+to that stream and decoder policy.
+
+VP9 packetization needs codec-specific handling. A compound superframe packet
+was rejected when submitted whole but every coded frame was accepted after the
+standard superframe index was split. Hidden alternate-reference frames still
+produced decoder outputs and must be submitted while presentation is
+suppressed. A show-existing-frame command produced a valid output in the newly
+supplied caller frame slot rather than returning the older reference pointer.
+See the [packetization example](../examples/vp9_packetization.cpp).
+
+Malformed input returned a decoder error, after which reset recovered on a
+known-good keyframe without recreating the process. The same decoder also
+accepted keyframe-driven 1080p-to-4K-to-1080p changes within its configured 4K
+maximum. Production code should still treat unexpected changes as guarded
+boundaries and retain strict output validation.
 
 No equivalent AV1 picture-info API, module route, AOM identifier, or usable
 decoder backend was found on firmware 6.02. A protocol layer may be

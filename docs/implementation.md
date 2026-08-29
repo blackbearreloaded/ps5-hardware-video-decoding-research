@@ -29,44 +29,47 @@ PS5 dependency.
 
 Use H.264 four-slice capability at 1080p. For HEVC, ask the host encoder for
 WPP where it exposes a suitable control, then verify the PPS flag. Keep both
-policies observable in telemetry.
+policies observable in telemetry. For VP9 4K, request four tile columns as the
+measured starting policy and verify the bitstream rather than trusting an
+encoder option name.
+
+Run network receive and access-unit assembly as a bounded producer independent
+of decode and completed-flip presentation. The measured serialized path lost no
+frames but accumulated receive backlog. Backpressure must be explicit; an
+unbounded jitter queue merely converts overload into latency.
 
 ## Per-frame flow
 
 The following is intentionally pseudocode; the exact ABI structures and memory
 functions remain platform-specific:
 
-```c
-int submit_access_unit(const encoded_access_unit_t *unit)
+```cpp
+SubmitResult submit_access_unit(const EncodedAccessUnit& unit)
 {
-    au_slot = next_au_slot();
-    frame_slot = next_frame_slot();
-
-    if (!gather_in_order(unit->fragments, unit->total_bytes, au_slot))
-        return DECODER_NEEDS_KEYFRAME;
-
-    input = make_input(au_slot, unit->total_bytes, unit->pts_us);
-    frame = make_frame(frame_slot, queried_frame_slot_size);
-    output = zeroed_output();
-
-    rc = sceVideodec2Decode(decoder, &input, &frame, &output);
-    if (rc != 0)
-        return DECODER_NEEDS_KEYFRAME;
-
-    if (!output.valid && pipeline_depth == 1) {
-        rc = sceVideodec2Flush(decoder, &frame, &output);
-        if (rc != 0)
-            return DECODER_NEEDS_KEYFRAME;
+    auto& au_slot = input_pool.acquire();
+    auto& frame_slot = frame_pool.acquire();
+    if (!gather_in_order(unit.fragments, unit.total_bytes, au_slot)) {
+        return SubmitResult::needs_keyframe;
     }
 
-    if (!validate_output(selected_mode, &frame, &output, frame_pool))
-        return DECODER_NEEDS_KEYFRAME;
+    auto input = make_input(au_slot, unit.total_bytes, unit.pts);
+    pending.push(unit.frame_flags, frame_slot);
+    auto output = decoder.decode(input, frame_slot);
+    if (!output && pipeline_depth == 1) {
+        output = decoder.flush(frame_slot);
+    }
+    if (!output) {
+        return SubmitResult::queued;
+    }
+    if (!validate_output(selected_mode, *output, frame_pool)) {
+        return SubmitResult::needs_keyframe;
+    }
 
-    return present_same_pointer(output.buffer, output.buffer_size,
-                                output.pitch, output.pitch_bytes,
-                                output.height,
-                                selected_mode->visible_width,
-                                selected_mode->visible_height);
+    const auto completed = pending.pop_front();
+    if (completed.show_frame || completed.show_existing_frame) {
+        presenter.present_same_pointer(*output, selected_mode.visible_size);
+    }
+    return SubmitResult::accepted;
 }
 ```
 
@@ -91,7 +94,16 @@ For 1080p Main10:
 - treat 16-bit components as low-aligned 10-bit; and
 - bind the exact returned pointer to the session's HDR descriptors.
 
-In both cases, require one picture, no output error, and exact membership in the
+For VP9 Profile 2:
+
+- require the exact negotiated profile rather than inferring it from the
+  returned format field;
+- at 1080p require 1920 components / 3840 bytes of pitch;
+- at 4K require 3840 components / 7680 bytes of pitch;
+- interpret active words as low-aligned 10-bit two-plane 4:2:0; and
+- keep color space, range, and transfer as independent stream state.
+
+In every case, require one picture, no output error, and exact membership in the
 caller frame pool. A valid-looking pointer outside that pool breaks the proven
 ownership contract.
 
@@ -113,6 +125,21 @@ If depth is greater than one:
 Do not use depth as a cosmetic “performance mode.” Expose it only with actual
 ready-latency and throughput telemetry.
 
+## VP9 packet and display policy
+
+Split a VP9 compound superframe using its standard trailing index before
+submitting coded frames. The measured decoder rejected the compound packet as
+one access unit but accepted every split coded frame. Carry parsed `show_frame`
+and `show_existing_frame` state beside each queued timestamp:
+
+- submit hidden alternate-reference frames and suppress their presentation;
+- submit show-existing-frame commands and present the returned materialized
+  caller-owned output; and
+- correlate output to queued coded frames, not container packets.
+
+The [C++20 packetization example](../examples/vp9_packetization.cpp) implements
+the superframe-index split and display decision without platform dependencies.
+
 ## Presentation selection
 
 Keep the established SDR presenter unchanged for H.264 and HEVC Main. Select a
@@ -121,7 +148,8 @@ small HDR branch once for a Main10 session:
 | Session | Input interpretation | Matrix/transfer | AGC target | VideoOut |
 |---|---|---|---|---|
 | H.264 / HEVC Main SDR | 8-bit NV12 | Existing Rec.709 SDR conversion | 8:8:8:8 | Existing SDR format |
-| HEVC Main10 HDR | Low-aligned 10-bit two-plane | Limited BT.2020 NCL, preserve PQ | 2:10:10:10 | Platform HDR 10-bit format |
+| VP9 Profile 0 SDR | 8-bit two-plane | Selected stream matrix/transfer | 8:8:8:8 | Existing SDR format |
+| HEVC Main10 or VP9 Profile 2 HDR | Low-aligned 10-bit two-plane | Limited BT.2020 NCL, preserve PQ when signaled | 2:10:10:10 | Platform HDR 10-bit format |
 
 Recreate VideoOut only at a safe owner/session boundary. A protocol-level HDR
 control callback should record state, not destroy graphics resources from its
@@ -169,6 +197,7 @@ present average/max
 callback-to-completed-flip average/min/max
 pending maximum, presented FPS, drops/drains/errors
 decoder-to-pool-to-AGC pointer-identity result (diagnostic builds)
+network first-byte, AU-ready, queue residency, and receive backlog
 ```
 
 Never label pipelined submission occupancy as hardware decode latency.
@@ -179,10 +208,16 @@ Request a new keyframe on decoder errors, unexpected codec/layout, output
 pointer violations, or presenter failure. Keep the last valid surface owned
 until its GPU/flip work completes.
 
-Treat codec, resolution, bit depth, and HDR state changes as session
-reconfiguration boundaries until seamless transitions are independently
-proven. Drain decoder and presenter work, release in dependency order, select a
-new tuple, and start from an IDR.
+Malformed VP9 input produced a decoder error, after which reset recovered on a
+known-good keyframe without process restart. Use that bounded recovery path:
+stop consuming dependent frames, reset, request a keyframe, and resume only
+after strict output validation succeeds.
+
+Keyframe-driven VP9 Profile 0 changes from 1080p to 4K and back succeeded in one
+decoder configured for the 4K maximum. Treat codec, profile, bit depth, and HDR
+changes as session reconfiguration boundaries. Resolution changes within a
+proven maximum may use a guarded fast path, but must update returned geometry
+and presenter descriptors before display.
 
 ## Optimizations worth keeping
 
@@ -190,9 +225,11 @@ new tuple, and start from an IDR.
 2. Fixed rotating AU/frame pools and no per-frame allocation.
 3. Four H.264 slices at 1080p.
 4. HEVC WPP on the host when available.
-5. Depth one when live decode fits the frame budget.
-6. No synchronous development telemetry in callbacks.
-7. Coded/visible geometry separation to avoid copies or rejection of valid
+5. Four VP9 tile columns for the tested 4K policy, remeasured per encoder.
+6. Separate bounded network receive and decode/present ownership.
+7. Depth one when live decode fits the frame budget.
+8. No synchronous development telemetry in callbacks.
+9. Coded/visible geometry separation to avoid copies or rejection of valid
    aligned surfaces.
 
 ## Ideas rejected or deferred
@@ -207,15 +244,19 @@ new tuple, and start from an IDR.
 - `sceVideoOutAddBuffer4k2kPrivilege` as a decoder optimization: display-buffer
   registration occurs after decode.
 - AV1 negotiation: no firmware-6.02 decoder backend.
-- 1440p/4K Main10: not proven by the 1080p controlled result.
+- 1440p HEVC Main10: not proven by the 1080p controlled result.
+- Alternate decoder resource classes: memory query alone did not make decoder
+  creation available, so no performance comparison exists.
 
 ## Recommended product rollout
 
 1. Retain H.264 1080p60/four-slice/depth-one as the stable default.
 2. Offer HEVC Main at 1080p and 1440p, then 4K as beta until natural-gameplay
    soaks provide repeated latency percentiles.
-3. Add 1080p Main10/HDR as an explicit experimental session mode with SDR HUD
+3. Add 1080p HEVC Main10/HDR as an explicit experimental session mode with SDR HUD
    disabled and strict state/layout validation.
-4. Validate sustained network HDR10 before enabling it by default.
-5. Derive larger Main10 descriptors and native high-resolution scanout only as
-   separate measured milestones.
+4. Add VP9 Profile 0 behind strict superframe/show-frame handling; use four
+   tiles as a measured 4K starting point.
+5. Treat VP9 Profile 2 4K as experimental until representative live content
+   and display-side HDR correctness are accepted.
+6. Keep native 4K VideoOut selection separate from decoder policy.

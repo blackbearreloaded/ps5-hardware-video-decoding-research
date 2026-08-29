@@ -3,7 +3,7 @@
 ## Test boundary
 
 The console experiments ran on one PlayStation 5 with firmware 6.02 between
-2026-08-24 and 2026-08-28. They used isolated, authorized test applications and a native
+2026-08-24 and 2026-08-29. They used isolated, authorized test applications and a native
 real-time streaming prototype. Every successful milestone fixed the tested
 build and bitstream, validated exact caller-pool pointer identity, recorded
 structured results, and shut down cleanly.
@@ -20,7 +20,8 @@ measurement boundary.
 | H.264 and HEVC console runs | Known-good modes, caller-owned surfaces, resolution comparisons, pipeline depth, WPP, and practical 4K60 timing |
 | HDR and Main10 console runs | Required application capability, 10-bit VideoOut, channel packing, BT.2020/PQ conversion, and Main10 surface layout |
 | Bounded AV1 interface review | Firmware-6.02 API/backend conclusion with AVC, HEVC, and VP9 positive controls |
-| Controlled VP9 console runs | Profile 0 lifecycle, resolution scaling, 4K tile-layout, decoder pipeline controls, caller-owned surface identity, and decode-to-completed-flip presentation |
+| Controlled VP9 console runs | Profile 0/2 lifecycle, resolution scaling, 4K tile-layout, decoder pipeline/recovery controls, caller-owned surface identity, endurance, LAN ingestion, and decode-to-completed-flip presentation |
+| Independent full-player control | Native 3840x2160 VideoOut and 4K60 HDR presentation capacity, kept separate from its software decoder |
 | Decoder/presenter prototype | Zero-copy pointer identity and integer luma/chroma sampling behavior |
 | Real-time streaming prototype | H.264 slice tuning, validated mode table, and live latency telemetry |
 | Application integration controls | AGC reconnect lifecycle, SDR HUD cost, display-owner handoff, source mapping, and inactive-HDR rejection |
@@ -95,6 +96,36 @@ submitted flip marker completed. Frames 1 through 59 averaged 16.676 ms from
 AU ready to completed flip and sustained 59.95 FPS. This timing starts after
 network reception and access-unit assembly; it is not a live callback result.
 
+Profile 2 controls proved low-aligned 10-bit caller-owned output at 1080p and
+4K. The matched four-tile 4K pair reached 72.37 FPS at depth one and 170.51 FPS
+at depth three. An ordered three-slot pipeline presented all 60 4K outputs
+through the 10-bit target at 59.53 FPS paced cadence, with 0.401 ms average
+submission and 40.483 ms average AU-ready-to-completed-flip latency. The remote
+capture did not add pixel-level visual evidence for this 4K run.
+
+A natural-content Profile 0 control produced a 287.01 FPS median over three
+runs. Its ten-minute, 36,000-frame extension had zero full-frame deadline
+misses. A separate paced TCP control received every one of 7,315,255 payload
+bytes and completed 60/60 decode/present operations. The intentionally
+serialized receive/decode/present design accumulated 85.917 ms of receive
+backlog, directly supporting a separate bounded network producer.
+
+Frame-structure controls established that compound superframe packets must be
+split into coded frames for this API, hidden frames still produce outputs but
+must not be presented, and show-existing commands materialize output into the
+new caller slot. Malformed input was recoverable with reset and a new keyframe;
+keyframe-driven 1080p/4K resolution changes succeeded within a 4K-configured
+decoder.
+
+The alternate decoder resource could be queried but decoder creation was not
+available, so no resource-class performance comparison exists. A firmware
+12.70 repeat remained unmeasured because the target's deployment service was
+unavailable on two locked attempts before application launch.
+
+Independent full-player evidence established native 3840x2160 VideoOut and
+about 59.9 FPS 4K60 HDR presentation. That player used software decoding, so
+the result is only scanout/presentation evidence.
+
 ## Confidence labels
 
 - **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
@@ -122,16 +153,19 @@ network reception and access-unit assembly; it is not a live callback result.
   representative live-content acceptance remains untested.
 - The raw-buffer shader's point sampling is source-proven, but no matched
   filtered-versus-point visual/performance run has been completed.
-- Main10/HDR is proven for one controlled 1080p frame, not a sustained network
-  stream.
-- 1440p/4K Main10, B frames, dynamic HDR transitions, live HDR HUD composition,
-  and native 4K HDR scanout remain untested.
-- 1440p and 4K SDR decoded surfaces were scaled into 1920x1080 VideoOut.
-- VP9 Profile 0 has controlled 60-frame decode proofs at 1080p, 1440p, and 4K,
-  plus a 4K exact-pointer decode-to-completed-flip proof for the tested linear
-  8-bit two-plane path. Profile 2 and representative live streaming remain
-  untested. The four-tile results use one synthetic stream and are not a
-  universal encoder or latency policy.
+- HEVC Main10/HDR is proven for one controlled 1080p frame, not a sustained
+  network stream.
+- VP9 Profile 2 is proven at 1080p and 4K, including completed 4K presentation,
+  but representative live HDR content and display-side photometric validation
+  remain untested.
+- 1440p/4K HEVC Main10, B frames, dynamic HDR transitions, and live HDR HUD
+  composition remain untested.
+- Most 1440p/4K decoder runs scaled into 1920x1080 VideoOut. Native 4K VideoOut
+  is supported by separate software-player evidence, not a matched hardware-
+  decoder-to-native-scanout benchmark.
+- VP9 Profile 0/2 results use a small number of synthetic and natural streams;
+  tile count, throughput, and latency policy are not universal encoder claims.
+- Firmware 12.70 portability is not measured.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

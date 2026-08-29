@@ -44,11 +44,19 @@ constexpr std::size_t kCodedHeight = 1088;
 constexpr std::size_t kYBytes = kPitchComponents * kCodedHeight * 2;
 constexpr std::size_t kRawBytes = kPitchComponents * kCodedHeight * 3;
 constexpr std::size_t kSlotBytes = align_up(kRawBytes, 16 * 1024);
+constexpr std::size_t kVp9PitchComponents = 3840;
+constexpr std::size_t kVp9CodedHeight = 2160;
+constexpr std::size_t kVp9YBytes = kVp9PitchComponents * kVp9CodedHeight * 2;
+constexpr std::size_t kVp9RawBytes = kVp9PitchComponents * kVp9CodedHeight * 3;
+constexpr std::size_t kVp9SlotBytes = align_up(kVp9RawBytes, 16 * 1024);
 constexpr std::uint32_t kPacked = pack_a2b10g10r10(0x155, 0x2aa, 0x3ff, 3);
 constexpr RgbPrime kNeutral = bt2020_ncl_preserve_pq(0.5F, 0.0F, 0.0F);
 
 static_assert(kRawBytes == 0x5fa000);
 static_assert(kSlotBytes == 0x5fc000);
+static_assert(kVp9YBytes == 0xfd2000);
+static_assert(kVp9RawBytes == 0x17bb000);
+static_assert(kVp9SlotBytes == 0x17bc000);
 static_assert((kPacked & 0x3ffU) == 0x155U);
 static_assert(((kPacked >> 10U) & 0x3ffU) == 0x2aaU);
 static_assert(((kPacked >> 20U) & 0x3ffU) == 0x3ffU);
@@ -63,6 +71,8 @@ int main()
     std::cout << std::hex << "Main10 Y bytes:  0x" << kYBytes << '\n'
               << "Main10 UV offset: 0x" << kYBytes << '\n'
               << "Raw/aligned size: 0x" << kRawBytes << " / 0x" << kSlotBytes << '\n'
+              << "VP9 P2 4K Y bytes: 0x" << kVp9YBytes << '\n'
+              << "VP9 P2 raw/aligned: 0x" << kVp9RawBytes << " / 0x" << kVp9SlotBytes << '\n'
               << "A2B10G10R10 word: 0x" << std::setw(8) << std::setfill('0') << kPacked
               << std::dec << std::setfill(' ') << '\n'
               << std::fixed << std::setprecision(3) << "Neutral PQ-coded RGB remains "

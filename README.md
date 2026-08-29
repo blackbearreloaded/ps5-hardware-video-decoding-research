@@ -10,11 +10,13 @@ measurement on PlayStation 5.
 
 The public game-process `libSceVideodec2` path decodes H.264 High and HEVC Main
 at 1080p, 1440p, and 4K into caller-owned GPU-visible memory. Controlled runs
-also prove VP9 Profile 0 decode at those resolutions, including tiled 4K and a
-correctly drained depth-three pipeline, to caller-owned direct memory.
+also prove VP9 Profile 0 decode at those resolutions and Profile 2 at 1080p and
+4K, including tiled 4K and correctly drained depth-three pipelines, to caller-
+owned direct memory.
+
 AGC consumes the exact returned pointer for the validated AVC/HEVC/VP9
-presentation paths, eliminating decoded-frame CPU copies. A bounded 1080p experiment also
-proves HEVC Main10 decode through public HDR VideoOut.
+presentation paths, eliminating decoded-frame CPU copies. A bounded 1080p
+experiment also proves HEVC Main10 decode through public HDR VideoOut.
 
 This repository uses **hardware video decoding** deliberately. Videodec2 is the
 console's media-decoder path; the results do not imply that RDNA shader compute
@@ -31,9 +33,10 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | HEVC Main10 / HDR10 | One controlled 1080p frame proven end to end |
 | Zero-copy presentation | Exact Videodec2 output pointer consumed by AGC |
 | Practical HEVC 4K60 | 60.36 FPS at depth one; 5.464 ms average synchronous decode |
-| VP9 Profile 0 | Controlled decode at 1080p, 1440p, and 4K; four-tile 4K reached 187.39 FPS decode-only at depth three and 59.95 FPS through completed flips at serialized depth one |
+| VP9 Profile 0 | Controlled decode at 1080p, 1440p, and 4K; four-tile 4K reached 187.39 FPS decode-only and 59.95 FPS through serialized completed flips |
+| VP9 Profile 2 | Caller-owned low-aligned 10-bit output at 1080p/4K; four-tile 4K reached 170.51 FPS decode-only and completed 60 Hz HDR-target presentation |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
-| Native 4K scanout | Not tested; 4K decoded surfaces were scaled to 1920x1080 VideoOut |
+| Native 4K scanout | Standard 3840x2160 VideoOut and about 59.9 FPS HDR presentation proven independently; that control used software decoding |
 | CI | Builds and runs the host-side contract examples |
 
 Firmware interfaces and title capabilities can change. Treat firmware 6.02 as
@@ -52,7 +55,11 @@ and untested claims separate.
 | Pipeline depth | More frames in flight improve throughput but increase frame residency |
 | VP9 4K tiling | Four tile columns improved depth-one throughput from 55.57 to 79.10 FPS with only 0.06% more encoded data |
 | VP9 4K presentation | Exact-pointer two-plane presentation sustained 59.95 FPS steady, with 16.676 ms average AU-ready-to-completed-flip latency |
-| Main10 storage | Two-plane 4:2:0 with low-aligned 10-bit words, not MSB-aligned P010 |
+| VP9 Profile 2 | 4K depth one reached 72.37 FPS; depth three reached 170.51 FPS and completed 60/60 10-bit presentations at paced 59.53 FPS |
+| VP9 endurance | Natural-content depth-three median was 287.01 FPS; 36,000 paced 4K60 frames completed with no full-frame deadline misses |
+| VP9 LAN ingestion | 60/60 framed 4K Profile 2 AUs completed; serialized receive exposed backlog and supports a separate bounded network producer |
+| VP9 frame structure | Split compound superframes; submit hidden frames without presenting; show-existing returns a materialized caller-owned output |
+| 10-bit storage | HEVC Main10 and VP9 Profile 2 use two-plane 4:2:0 with low-aligned words, not MSB-aligned P010 |
 | HDR output | BT.2020-NCL conversion preserves PQ into A2B10G10R10 VideoOut |
 | Reconnect lifecycle | AGC initialization is process-global; retain it while rebuilding per-stream resources |
 | In-band SDR HUD | One extra draw in the existing AGC command buffer caused no meaningful measured latency regression |
@@ -63,7 +70,10 @@ and untested claims separate.
 
 ```text
 Compressed network stream
+  -> framed container/protocol packet
+  -> split VP9 compound packets into individual coded frames when present
   -> complete encoded access unit
+  -> bounded receive/jitter queue independent of blocking presentation
   -> ordered fragment gather into a fixed direct-memory input slot
   -> Videodec2 decode into a caller-owned frame slot
   -> codec, coded-size, pitch, byte-pitch, and pointer validation
@@ -85,8 +95,9 @@ renders the surface into a scanout framebuffer.
 | H.265 / HEVC Main10 | Controlled console proof | 1920x1080 BT.2020/PQ frame and caller-owned 10-bit surface |
 | HDR10 presentation | Controlled console proof | Main10 -> AGC BT.2020-NCL -> 10-bit HDR VideoOut |
 | VP9 Profile 0 | Controlled console proof | 8-bit 4:2:0 at 1080p, 1440p, and 2160p; caller-owned direct-memory output and 4K scaled presentation |
+| VP9 Profile 2 | Controlled console proof | Low-aligned 10-bit 4:2:0 at 1080p and 2160p; caller-owned output and 4K HDR-target presentation |
 | AV1 | Unavailable through examined APIs | No usable decoder route was identified |
-| Native 4K scanout | Not proven | Current 4K tests scale into a 1920x1080 display target |
+| Native 4K scanout | Supporting full-player proof | Standard 3840x2160 VideoOut at about 59.9 FPS; software decoder, so not a Videodec2 benchmark |
 
 The AV1 result is an API and firmware conclusion. It does not prove the custom
 SoC physically lacks every possible AV1-capable circuit.
@@ -111,6 +122,11 @@ must match before comparing platforms.
 | Controlled VP9 Profile 0 4K60 source | Four tiles, depth 1, decode-only | 12.376 ms steady decode; 79.10 FPS batch throughput |
 | Same four-tile VP9 bytes | Depth 3, decode-only | 4.633 ms median submission; 15.082 ms median ready; 187.39 FPS batch throughput |
 | Same four-tile VP9 stream | Depth 1, serialized decode/present | 12.311 ms decode/ready; 16.676 ms AU-ready-to-completed-flip; 59.95 FPS steady |
+| Controlled VP9 Profile 2 4K | Four tiles, depth 1 / 3 | 72.37 / 170.51 FPS decode-only batch throughput |
+| Same Profile 2 stream | Depth 3, paced HDR-target presentation | 0.401 ms submission; 40.483 ms AU-ready-to-flip; 59.53 FPS |
+| Natural-content VP9 Profile 0 4K | Four tiles, depth 3, three runs | 287.01 FPS median; 3.6% max-to-min spread |
+| Same natural-content policy | Ten-minute paced endurance | 36,000 frames; zero full-frame deadline misses |
+| Paced LAN VP9 Profile 2 4K | Serialized receive/decode/present control | 0.266 ms AU fill; 50.066 ms AU-ready-to-flip; 60/60 complete |
 
 The 0.333 ms depth-three figure is API submission occupancy, not decode
 latency. See [Benchmarks and measurement method](docs/benchmarks.md) for the
@@ -129,12 +145,15 @@ mkdir -p build
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/video_modes.cpp -o build/video_modes
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr_contract.cpp -o build/hdr_contract
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/timing_model.cpp -o build/timing_model
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9_packetization.cpp -o build/vp9_packetization
 
 ./build/video_modes h264 1080
 ./build/video_modes hevc 2160
 ./build/video_modes main10 1080
+./build/video_modes vp9p2 2160
 ./build/hdr_contract
 ./build/timing_model
+./build/vp9_packetization
 ```
 
 See [Minimal examples](examples/README.md) for the use-case mapping.
@@ -148,11 +167,15 @@ See [Minimal examples](examples/README.md) for the use-case mapping.
 4. Request HEVC WPP and verify the PPS instead of assuming it is enabled.
 5. Request four VP9 tile columns for the tested 4K encoder policy, then verify
    the bitstream and measure representative live content.
-6. Preserve coded dimensions separately from visible crop, particularly
+6. Split VP9 compound superframes into coded frames; submit hidden frames but
+   suppress presentation, and present materialized show-existing output.
+7. Keep network receive/jitter buffering independent of blocking completed-flip
+   presentation, with a bounded queue and explicit backpressure.
+8. Preserve coded dimensions separately from visible crop, particularly
    3840x2176 coded versus 3840x2160 visible.
-7. Keep H.264, HEVC Main, and Main10/HDR as explicit negotiated modes.
-8. Measure submission, output-ready, throughput, and completed-flip boundaries
-   separately.
+9. Keep H.264, HEVC Main/Main10, and VP9 Profile 0/2 as explicit negotiated modes.
+10. Measure network first-byte, AU-ready, submission, output-ready, throughput,
+    and completed-flip boundaries separately.
 
 ## Documentation
 
@@ -161,10 +184,10 @@ See [Minimal examples](examples/README.md) for the use-case mapping.
 | [Architecture and memory](docs/architecture.md) | Videodec2, AGC, VideoOut, memory ownership, zero-copy limits, and lifecycle |
 | [Codecs and resolutions](docs/codecs-and-resolutions.md) | Proven codec/profile/level tuples, pitches, coded sizes, and visible crops |
 | [Benchmarks](docs/benchmarks.md) | Controlled and live timing tables, pipeline depth, WPP, slices, and methodology |
-| [HDR and Main10](docs/hdr.md) | Title capability, decoded storage, BT.2020/PQ conversion, packing, and negotiation |
+| [10-bit surfaces and HDR10](docs/hdr.md) | HEVC Main10/VP9 Profile 2 storage, title capability, BT.2020/PQ conversion, packing, and negotiation |
 | [Implementation guide](docs/implementation.md) | Minimal real-time streaming integration, validation, telemetry, errors, and rollout |
 | [Evidence and limits](docs/evidence.md) | Research snapshots, milestone map, confidence labels, and unproven areas |
-| [Examples](examples/README.md) | Host-compilable codec, resolution, HDR, and timing contract checks |
+| [Examples](examples/README.md) | Host-compilable codec, resolution, HDR, timing, and VP9 packetization contract checks |
 | [Publication policy](PUBLICATION.md) | Content boundary, contributor checklist, and legal-review limits |
 
 ## Repository layout
@@ -174,12 +197,13 @@ README.md                         Research overview and headline results
 docs/architecture.md              Hardware stages and memory ownership
 docs/codecs-and-resolutions.md    Decoder tuples and output layouts
 docs/benchmarks.md                Complete controlled and live measurements
-docs/hdr.md                       Main10 and public HDR presentation contract
+docs/hdr.md                       HEVC/VP9 10-bit and HDR presentation contract
 docs/implementation.md            Real-time streaming integration guidance
 docs/evidence.md                  Evidence lineage and research limits
 examples/video_modes.cpp          Codec/resolution mode selection
-examples/hdr_contract.cpp         Main10 layout, color matrix, and packing
+examples/hdr_contract.cpp         HEVC/VP9 10-bit layouts, color matrix, and packing
 examples/timing_model.cpp         Submission, ready, and flip timing semantics
+examples/vp9_packetization.cpp    Superframe splitting and hidden/show-existing policy
 .github/workflows/examples.yml    Strict C++20 example validation
 PUBLICATION.md                    Publication and contribution boundary
 ```
@@ -198,6 +222,8 @@ Evidence labels are intentionally narrow:
 - **Platform-interface evidence:** a concrete route or API exists but was not
   exercised here.
 - **Unavailable:** no usable firmware-6.02 implementation path was found.
+- **Bounded unavailable:** a prerequisite failed repeatedly before the target
+  behavior could be measured; no positive or negative capability is inferred.
 
 ## External projects and references
 

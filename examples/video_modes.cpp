@@ -24,7 +24,7 @@ struct VideoMode
     std::string_view surface;
 };
 
-constexpr std::array<VideoMode, 10> kModes{{
+constexpr std::array<VideoMode, 12> kModes{{
     {"h264", 1080, "High", "5.1", 1920, 1088, 1920, 1088, 0, 2048, 2048, 1920,
      "NV12"},
     {"h264", 1440, "High", "5.1", 2560, 1440, 2560, 1440, 0, 2560, 2560, 2560,
@@ -40,11 +40,15 @@ constexpr std::array<VideoMode, 10> kModes{{
     {"main10", 1080, "Main10", "4.1", 1920, 1088, 1920, 1088, 0, 1920, 3840, 1920,
      "low-aligned 10-bit 4:2:0"},
     {"vp9", 1080, "Profile 0", "4.1", 1920, 1080, 1920, 1080, 0, 2048, 2048, 1920,
-     "format 0; presentation layout untested"},
+     "8-bit two-plane"},
     {"vp9", 1440, "Profile 0", "5.0", 2560, 1440, 2560, 1440, 0, 2560, 2560, 2560,
-     "format 0; presentation layout untested"},
+     "8-bit two-plane"},
     {"vp9", 2160, "Profile 0", "5.1", 3840, 2160, 3840, 2160, 0, 3840, 3840, 3840,
-     "format 0; presentation layout untested"},
+     "8-bit two-plane"},
+    {"vp9p2", 1080, "Profile 2", "4.1", 1920, 1080, 1920, 1080, 0, 1920, 3840,
+     1920, "low-aligned 10-bit 4:2:0"},
+    {"vp9p2", 2160, "Profile 2", "5.1", 3840, 2160, 3840, 2160, 0, 3840, 7680,
+     3840, "low-aligned 10-bit 4:2:0"},
 }};
 
 constexpr const VideoMode *find_mode(std::string_view codec, std::uint32_t visible_height) noexcept
@@ -76,13 +80,15 @@ static_assert(find_mode("hevc", 2160)->alternate_coded_height == 2176);
 static_assert(find_mode("main10", 1440) == nullptr);
 static_assert(find_mode("vp9", 1080)->pitch_bytes == 2048);
 static_assert(find_mode("vp9", 2160)->coded_height == 2160);
+static_assert(find_mode("vp9p2", 2160)->pitch_bytes == 7680);
 } // namespace
 
 int main(int argc, char **argv)
 {
     if (argc != 3)
     {
-        std::cerr << "usage: " << argv[0] << " h264|hevc|main10|vp9 1080|1440|2160\n";
+        std::cerr << "usage: " << argv[0]
+                  << " h264|hevc|main10|vp9|vp9p2 1080|1440|2160\n";
         return 2;
     }
 

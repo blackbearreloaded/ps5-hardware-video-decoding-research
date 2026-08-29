@@ -11,6 +11,7 @@ primary measurements separate:
 | Submission-to-output-ready | Submission/callback timestamp | Call that returns the correlated output | Per-frame decoder pipeline residency |
 | Sustained decode-only throughput | First batch submission | Final drained output | Capacity with multiple frames in flight |
 | Callback-to-completed-flip | Encoded-frame callback arrival | Submitted VideoOut marker observed complete | Gather + decode residency + AGC + display pacing |
+| Network first-byte to AU-ready | First framing byte received | Complete encoded access unit available | Transport and access-unit assembly only |
 
 Compressed gather and presenter duration are useful secondary metrics.
 Presenter duration includes waiting for the observed flip marker, so it is not
@@ -135,6 +136,55 @@ scheduling, so it must not be relabeled as a live network callback result.
 This controlled test validates complete 4K VP9 surface presentation and steady
 60 Hz cadence. It does not replace the 187.39 FPS depth-three decode-capacity
 result or establish representative live-stream latency.
+
+## VP9 Profile 2, endurance, and LAN controls
+
+Profile 2 returned a caller-owned two-plane surface with low-aligned 10-bit
+components. The matched 4K capacity pair used the same four-tile 60-frame
+stream and changed only decoder depth.
+
+| Profile 2 4K control | Output split | Submission | Output-ready | Throughput/cadence |
+|---|---:|---:|---:|---:|
+| Depth 1, decode-only | 60 / 0 | 13.267 ms median | Synchronous; 16.839 ms p95 | 72.37 FPS batch |
+| Depth 3, decode-only | 58 / 2 | 4.690 ms median | 16.567 ms median | 170.51 FPS batch |
+| Depth 3, paced HDR-target presentation | 58 / 2 | 0.401 ms average | 33.506 ms average | 59.53 FPS; 40.483 ms AU-ready-to-flip |
+
+The completed-flip case used three rotating caller-owned slots. Its deeper
+pipeline preserved 60 Hz display cadence but increased residency, so the
+40.483 ms result must not be compared with a depth-one submission call.
+
+A locally encoded natural-content Profile 0 control repeated the exact
+four-tile depth-three bytes three times:
+
+| Run | Throughput | Submission median | Output-ready median |
+|---:|---:|---:|---:|
+| 1 | 288.71 FPS | 1.589 ms | 9.361 ms |
+| 2 | 278.44 FPS | 2.444 ms | 9.286 ms |
+| 3 | 287.01 FPS | 2.052 ms | 9.387 ms |
+
+Median throughput was 287.01 FPS and maximum-to-minimum spread was 3.6% of the
+median. A ten-minute extension submitted 36,000 paced 4K60 frames with no
+full-frame deadline misses and 135 us maximum scheduling lateness. Submission
+occupancy averaged 0.326 ms and peaked at 1.068 ms. These sample-specific
+results demonstrate sustained headroom; they are not a universal VP9 rate.
+
+The real-LAN control sent the exact Profile 2 4K stream as 60 length-framed
+access units at 16,667 us cadence. All 7,315,255 payload bytes, 60 decoder
+outputs, and 60 completed flips arrived without loss or lifecycle error.
+
+| LAN boundary | Result |
+|---|---:|
+| Connect to first HTTP response byte | 1.132 ms |
+| First framing byte to complete AU | 0.266 ms average / 2.815 ms maximum |
+| AU ready to completed flip | 50.066 ms average |
+| First framing byte to completed flip | 50.332 ms average |
+| Serialized batch cadence | 55.91 FPS |
+
+That probe deliberately put receive, decode, and completed-flip presentation
+on one thread. It accumulated 85.917 ms behind the sender's schedule despite
+losing no frames. This is evidence for a separate receive/jitter-buffer
+producer feeding a bounded decoder queue, not evidence that the LAN itself
+needed 50 ms to deliver each access unit.
 
 ## H.264 live slice tuning at 1080p60
 

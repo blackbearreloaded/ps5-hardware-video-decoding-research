@@ -80,6 +80,15 @@ the bounds-checked compressed frame payload. A production demuxer should
 likewise pass one already-framed VP9 payload rather than IVF or WebM container
 bytes.
 
+For VP9 carried in WebM or another packet source, inspect the standard
+superframe index before submission. The tested decoder rejected a compound
+packet containing multiple coded frames, but accepted every frame after the
+packet was split. Submit hidden alternate-reference frames even though they
+must not be presented. Submit show-existing-frame commands as coded inputs too;
+the tested API materialized the referenced picture into the newly supplied
+caller-owned frame slot. See the host-side
+[packetization example](../examples/vp9_packetization.cpp).
+
 ## Memory contract
 
 Query every size for the selected codec/profile/resolution at runtime. The
@@ -102,7 +111,9 @@ client uses three rotating AU slots and three rotating frame slots to avoid
 per-frame allocation and provide safe ownership across decode/present. A
 deeper experimental pipeline needs enough distinct slots for all in-flight
 work; the HEVC depth-six experiment used six, while the VP9 depth-three
-experiment conservatively used six.
+experiment conservatively used six. A later ordered Profile 2 decode/present
+control proved that three slots are sufficient for depth three when each
+surface is reused only after its completed flip.
 
 The frame validation gate must check more than a successful return code:
 
@@ -126,10 +137,11 @@ no immediate flush. At VP9 depth three, the first two calls filled the pipeline,
 58 calls returned pictures, and the final two pictures required an
 end-of-stream drain. The live rule is:
 
-```c
-decode(access_unit, frame_slot, &output);
-if (!output.valid && pipeline_depth == 1)
-    flush(frame_slot, &output);
+```cpp
+auto output = decoder.decode(access_unit, frame_slot);
+if (!output.valid && pipeline_depth == 1) {
+    output = decoder.flush(frame_slot);
+}
 ```
 
 Do not blindly flush HEVC, and do not assume that H.264 behavior is universal
@@ -152,7 +164,11 @@ addresses. Returned pitch was 2048 bytes at 1920x1080, 2560 at 2560x1440, and
 3840 at 3840x2160. A controlled 4K presentation displayed the complete source,
 expected color order, diagonal features, and fine checker detail through the
 tested linear 8-bit two-plane texture description. Treat this as validation of
-that exact Profile 0 path, not every VP9 profile or format.
+that exact Profile 0 path. Profile 2 at 1080p and 4K returned the same pointer
+ownership with low-aligned 10-bit words, 1920/3840 and 3840/7680 component/byte
+pitches respectively. Its three-slot 4K pipeline also reached completed flips
+through the 10-bit target; pixel-level HDR capture was not repeated in that
+case.
 
 AGC uses coded height to locate the chroma plane and visible dimensions to crop
 or scale. This distinction is required for the proven live 4K layout:
@@ -162,14 +178,31 @@ surface: 3840 x 2176 coded, pitch 3840
 picture: 3840 x 2160 visible
 ```
 
-The current renderer scales 1440p and 4K decoded surfaces into a 1920x1080
-VideoOut target. This proves high-resolution decoding and presentation, not
-native high-resolution scanout.
+Most decoder controls scale 1440p and 4K surfaces into a 1920x1080 VideoOut
+target. An independent full-player control used standard native 3840x2160
+VideoOut and held about 59.9 FPS for a 4K60 HDR presentation workload. Because
+that player decoded in software, the result proves scanout/presentation
+capacity only and must not be attributed to Videodec2.
 
 The presenter waits until `sceVideoOutGetFlipStatus()` observes its submitted
 marker. Reported presentation and callback-to-flip timing therefore includes
 AGC work plus display pacing. `sceAgcSuspendPoint()` is a required lifecycle
 boundary after GPU submission, and shutdown must drain pending flips/vblank.
+
+## Network and pipeline ownership
+
+Keep socket receive independent of decode and blocking completed-flip
+presentation. A deliberately serialized Profile 2 4K control received every
+byte and presented every frame, but accumulated 85.917 ms behind a 60 Hz sender
+and completed at 55.91 FPS. The access-unit fill itself averaged only 0.266 ms.
+Use a bounded producer/consumer queue: the network producer assembles complete
+access units, the decoder owns input/frame slots while in flight, and the
+presenter releases a decoded slot only after its GPU/flip completion fence.
+
+Bound the queue to the negotiated latency policy and drop/request a keyframe
+according to the streaming protocol rather than allowing unbounded buffering.
+Record first-byte, AU-ready, output-ready, and completed-flip timestamps on a
+common monotonic clock.
 
 ## AGC lifetime and display ownership
 
@@ -259,5 +292,6 @@ decoded. Decoder submission and output-ready timing end before a scanout buffer
 is registered or flipped, so this call cannot speed the codec engine.
 
 Native 4K scanout could avoid scaling into a 1080p target and improve final
-image quality or presentation workload. It is a separate display experiment,
-not a decoder optimization.
+image quality or presentation workload. The independent full-player result
+confirms that public native 4K scanout is practical, but it remains a separate
+display result rather than a decoder optimization.

@@ -17,13 +17,16 @@ mkdir -p build
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/video_modes.cpp -o build/video_modes
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/hdr_contract.cpp -o build/hdr_contract
 c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/timing_model.cpp -o build/timing_model
+c++ -std=c++20 -Wall -Wextra -Wpedantic -Werror examples/vp9_packetization.cpp -o build/vp9_packetization
 
 ./build/video_modes h264 1080
 ./build/video_modes hevc 2160
 ./build/video_modes vp9 1080
+./build/video_modes vp9p2 2160
 ./build/video_modes main10 1080
 ./build/hdr_contract
 ./build/timing_model
+./build/vp9_packetization
 ```
 
 On Windows, use the same commands from a Clang Developer PowerShell and add
@@ -37,11 +40,13 @@ On Windows, use the same commands from a Clang Developer PowerShell and add
 | Select HEVC Main at 1080p, 1440p, or 4K | `video_modes.cpp hevc <height>` |
 | Select the proven HEVC Main10 tuple | `video_modes.cpp main10 1080` |
 | Select VP9 Profile 0 at 1080p, 1440p, or 4K | `video_modes.cpp vp9 <height>` |
+| Select VP9 Profile 2 at 1080p or 4K | `video_modes.cpp vp9p2 <height>` |
 | Preserve maximum, coded, visible, and pitch dimensions | `video_modes.cpp` |
-| Calculate the Main10 Y/UV plane layout | `hdr_contract.cpp` |
+| Calculate HEVC Main10 and VP9 Profile 2 Y/UV plane layouts | `hdr_contract.cpp` |
 | Pack the public 10-bit VideoOut word | `hdr_contract.cpp` |
 | Apply the preserve-PQ BT.2020-NCL matrix | `hdr_contract.cpp` |
 | Distinguish submission, ready, and completed-flip timing | `timing_model.cpp` |
+| Split VP9 superframes and suppress hidden-frame presentation | `vp9_packetization.cpp` |
 
 These are contract examples, not a drop-in decoder or a substitute for runtime
 memory queries and output validation.
