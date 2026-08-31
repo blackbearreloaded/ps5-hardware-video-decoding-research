@@ -2,11 +2,14 @@
 
 ## Test boundary
 
-The console experiments ran on one PlayStation 5 with firmware 6.02 between
-2026-08-24 and 2026-08-29. They used isolated, authorized test applications and a native
-real-time streaming prototype. Every successful milestone fixed the tested
-build and bitstream, validated exact caller-pool pointer identity, recorded
-structured results, and shut down cleanly.
+The decoder experiments began on one PlayStation 5 with firmware 6.02 between
+2026-08-24 and 2026-08-29. High-refresh presentation work continued through
+2026-08-30 and repeated the true-4K-source control on a second PlayStation 5
+with firmware 12.70. The work used isolated, authorized test applications and
+a native real-time streaming prototype. Every successful controlled milestone
+fixed the tested build and source, recorded structured results, and shut down
+cleanly; decoder milestones additionally validated exact caller-pool pointer
+identity.
 
 This public guide intentionally omits console addresses, credentials, signed
 artifacts, firmware/application binaries, implementation extracts, and local
@@ -22,8 +25,9 @@ measurement boundary.
 | Bounded AV1 interface review | Firmware-6.02 API/backend conclusion with AVC, HEVC, and VP9 positive controls |
 | Controlled VP9 console runs | Profile 0/2 lifecycle, resolution scaling, 4K tile-layout, decoder pipeline/recovery controls, caller-owned surface identity, endurance, LAN ingestion, and decode-to-completed-flip presentation |
 | Independent full-player control | Native 3840x2160 VideoOut and 4K60 HDR presentation capacity, kept separate from its software decoder |
-| Decoder/presenter prototype | Zero-copy pointer identity and integer luma/chroma sampling behavior |
-| Real-time streaming prototype | H.264 slice tuning, validated mode table, and live latency telemetry |
+| Native HFR presenter controls | 1080p 90/120 cadence and true-4K-source 3840x2160/119.88 Hz output on firmware 6.02 and 12.70 |
+| Decoder/presenter prototype | Zero-copy pointer identity, point-sampled research output, and later filtered 1440p-to-4K product output |
+| Real-time streaming prototype | H.264 slice tuning, validated mode table, live latency telemetry, and H.264 1080p/1440p/2160p HFR acceptance |
 | Application integration controls | AGC reconnect lifecycle, SDR HUD cost, display-owner handoff, source mapping, and inactive-HDR rejection |
 
 The public text is a factual synthesis and the examples were independently
@@ -49,7 +53,22 @@ remain outside the publication.
 | HUD control | Small SDR overlay in the existing AGC submission preserved the measured latency class |
 | Display handoff control | Valid decode/AGC markers and even a completed background flip can coexist with invisible output when foreground ownership is elsewhere |
 | Full-frame mapping diagnosis | Inherited partial-view affine transform cropped valid pixels; a complete affine and destination safe-area control restored the full chart |
-| Raw-buffer shader audit | Current Y/UV fetches use integer point sampling; filtered scale remains untested |
+| Raw-buffer shader audit | Original Y/UV fetches use integer point sampling; later filtered 1440p-to-4K product presentation was hardware-accepted |
+
+### High refresh and native 4K output
+
+| Milestone | Result used by this guide |
+|---|---|
+| 1080p HFR cadence | Isolated targets measured 89.99 FPS at 90 FPS and 119.85 FPS at 120 FPS |
+| Native 4K HFR, firmware 6.02 | True 3840x2160 source and output; 600/600 frames at 119.87 FPS |
+| Native 4K HFR, firmware 12.70 | Same true-4K-source control; 600/600 frames at 119.88 FPS |
+| Live host negotiation | 1440p/90 matched a 90 Hz host capture; 2160p/120 matched a 120 Hz host capture |
+| Live product acceptance | H.264 streaming worked at 1080p/120, 1440p/120, and 2160p/120 |
+| HDMI transition control | One TV/port briefly resynchronized before first application draw; another HDMI path did not show the black interval |
+
+The HFR controls prove presentation capacity and the product sessions prove
+integration. They are not a controlled cross-codec 4K/120 decode-latency
+distribution. See [High-refresh and native 4K output](high-refresh-output.md).
 
 ### HDR and Main10
 
@@ -124,13 +143,17 @@ available, so no resource-class performance comparison exists. A firmware
 12.70 repeat remained unmeasured because the target's deployment service was
 unavailable on two locked attempts before application launch.
 
-Independent full-player evidence established native 3840x2160 VideoOut and
-about 59.9 FPS 4K60 HDR presentation. That player used software decoding, so
-the result is only scanout/presentation evidence.
+Independent full-player evidence first established native 3840x2160 VideoOut
+and about 59.9 FPS 4K60 HDR presentation with software decoding. The later
+native HFR oracles extended presentation evidence to a true 3840x2160 source
+at 119.88 Hz on firmware 6.02 and 12.70. ProsperoLight then operator-accepted
+live H.264 2160p/120 through VideoDec2 and AGC, but did not capture a controlled
+decode-to-completed-flip latency distribution for that session.
 
 ## Confidence labels
 
-- **Console-proven:** the exact tuple/path ran successfully on firmware 6.02.
+- **Console-proven:** the exact tuple/path ran successfully on the stated
+  firmware; decoder rows default to firmware 6.02 unless noted otherwise.
 - **Controlled only:** a deterministic file or frame ran, but a sustained live
   product workload has not.
 - **Platform-interface evidence:** a concrete route or API exists, but this study
@@ -153,8 +176,9 @@ the result is only scanout/presentation evidence.
   requirement.
 - The original affine crop and controlled corrected mapping are evidence-backed;
   representative live-content acceptance remains untested.
-- The raw-buffer shader's point sampling is source-proven, but no matched
-  filtered-versus-point visual/performance run has been completed.
+- The original raw-buffer shader's point sampling is source-proven and the
+  later product path hardware-accepted filtered 1440p-to-4K output, but no
+  matched filtered-versus-point performance distribution was captured.
 - HEVC Main10/HDR is proven for one controlled 1080p frame, not a sustained
   network stream.
 - VP9 Profile 2 is proven at 1080p and 4K, including completed 4K presentation,
@@ -162,12 +186,14 @@ the result is only scanout/presentation evidence.
   remain untested.
 - 1440p/4K HEVC Main10, B frames, dynamic HDR transitions, and live HDR HUD
   composition remain untested.
-- Most 1440p/4K decoder runs scaled into 1920x1080 VideoOut. Native 4K VideoOut
-  is supported by separate software-player evidence, not a matched hardware-
-  decoder-to-native-scanout benchmark.
+- Most original 1440p/4K decoder benchmarks scaled into 1920x1080 VideoOut.
+  Native 4K/119.88 Hz presentation and live H.264 2160p/120 integration are now
+  proven separately, but a controlled multi-codec decoder-to-native-scanout
+  benchmark is still missing.
 - VP9 Profile 0/2 results use a small number of synthetic and natural streams;
   tile count, throughput, and latency policy are not universal encoder claims.
-- Firmware 12.70 portability is not measured.
+- Firmware 12.70 portability is proven for the true-4K-source 119.88 Hz
+  presenter and ProsperoLight lifecycle, not for every decoder benchmark.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

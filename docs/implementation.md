@@ -118,8 +118,9 @@ ownership contract.
 ## Queue-depth policy
 
 Depth one is the low-latency default and sustained the practical live 4K60
-test. Consider depth three only when repeated live depth-one p95/p99 decode
-time approaches the 16.67 ms frame period.
+test. At 90 and 120 FPS, compare repeated live depth-one p95/p99 against the
+11.11 and 8.34 ms frame periods respectively. Consider depth three only when
+the stream needs throughput headroom and the added residency is acceptable.
 
 If depth is greater than one:
 
@@ -162,6 +163,18 @@ small HDR branch once for a Main10 session:
 Recreate VideoOut only at a safe owner/session boundary. A protocol-level HDR
 control callback should record state, not destroy graphics resources from its
 callback thread.
+
+Select output geometry independently from decoder allocation:
+
+| Visible stream | Output target | Policy |
+|---:|---:|---|
+| 1920x1080 | 1920x1080 | Present 1:1 |
+| 2560x1440 | 3840x2160 | Filter once in AGC |
+| 3840x2160 | 3840x2160 | Present the visible picture 1:1 |
+
+The same geometry applies at 60, 90, and 120 FPS. Native 2560x1440 scanout is
+not established, while native 3840x2160 at 119.88 Hz is console-proven on
+firmware 6.02 and 12.70. See [High-refresh and native 4K output](high-refresh-output.md).
 
 ## Presenter ownership and mapping
 
@@ -245,6 +258,8 @@ and presenter descriptors before display.
 8. No synchronous development telemetry in callbacks.
 9. Coded/visible geometry separation to avoid copies or rejection of valid
    aligned surfaces.
+10. Resolution-aware VideoOut targets, with native 4K retained at high refresh.
+11. Bitrate tuned per codec/content/network rather than maximized globally.
 
 ## Ideas rejected or deferred
 
@@ -273,4 +288,6 @@ and presenter descriptors before display.
    tiles as a measured 4K starting point.
 5. Treat VP9 Profile 2 4K as experimental until representative live content
    and display-side HDR correctness are accepted.
-6. Keep native 4K VideoOut selection separate from decoder policy.
+6. Offer 90/120 FPS only with bounded queues, completed-flip telemetry, and a
+   wired-network recommendation; tune bitrate per configuration.
+7. Keep native 4K VideoOut selection separate from decoder policy.

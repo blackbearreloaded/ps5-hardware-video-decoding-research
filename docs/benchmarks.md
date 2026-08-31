@@ -301,6 +301,37 @@ stream whose depth-one percentiles threaten 16.67 ms.
 Do not compare the live 5.464 ms and controlled 20.719 ms results without the
 approximately 12 versus 72 Mb/s payload and content-complexity difference.
 
+## High-refresh and native 4K presentation
+
+These rows measure presenter cadence, not isolated codec-engine time. The
+fixed-source controls remove network and decode variability so VideoOut and AGC
+capacity can be tested directly.
+
+| Workload | Source / output | Requested frames | Measured cadence | Result |
+|---|---|---:|---:|---|
+| Firmware-6.02 1080p HFR control | 1920x1080 / 1920x1080 | 90 FPS | 89.99 FPS | All requested frames presented |
+| Firmware-6.02 1080p HFR control | 1920x1080 / 1920x1080 | 120 FPS | 119.85 FPS | All requested frames presented |
+| Firmware-6.02 native 4K HFR control | 3840x2160 / 3840x2160 | 600 | 119.87 FPS | 600/600; clean teardown |
+| Firmware-12.70 native 4K HFR control | 3840x2160 / 3840x2160 | 600 | 119.88 FPS | 600/600; clean teardown |
+| CPU-regenerated loading control | 1920x1080 / 1920x1080 | 120 FPS | 109.33 FPS | Full-surface CPU generation/flush was the bottleneck |
+
+A live product session also accepted H.264 2160p/120 through Sunshine,
+VideoDec2, AGC, and native 4K HFR output. It is recorded as operator acceptance,
+not as a controlled timing row, because a full decode-ready and
+callback-to-completed-flip distribution was not retained.
+
+At 90 FPS the frame period is 11.11 ms; at the platform's 119.88 Hz mode it is
+about 8.34 ms. The practical roughly 12 Mb/s HEVC 4K stream's 5.464 ms average
+synchronous decode fits inside the latter average budget, but its 34.455 ms
+callback-to-flip maximum does not. The controlled roughly 72 Mb/s stream's
+20.719 ms depth-one decode also exceeds the budget. Native 4K/120 presentation
+therefore does not make 4K/120 decode universal: bitrate, frame structure,
+content, encoder policy, queueing, and tail latency still decide whether a live
+stream is smooth.
+
+See [High-refresh and native 4K output](high-refresh-output.md) for output
+geometry, HDMI transition behavior, and the live-stream tuning checklist.
+
 ## Why mini-PC and media-box numbers can look lower
 
 Published decoder figures often measure API submission, asynchronous GPU/media

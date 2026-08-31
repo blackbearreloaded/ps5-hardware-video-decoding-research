@@ -51,8 +51,10 @@ depth-one decode averaged 9.405 ms for H.264 including flush and 9.872 ms for
 HEVC, leaving synchronous room inside a 16.67 ms 60 Hz interval for those
 particular streams.
 
-The test presented by scaling into the existing 1920x1080 VideoOut target.
-Native 1440p scanout was not part of the result.
+The original decoder test presented by scaling into a 1920x1080 VideoOut
+target. The later product path retained the 2560x1440 decoded surface and used
+filtered AGC scaling into a 3840x2160 target at both standard and high refresh.
+Native 2560x1440 scanout itself remains unproven.
 
 ### 2160p / 4K
 
@@ -67,15 +69,17 @@ Never make one returned height universal. Keep at least these fields separate:
 allocation/config maximum: 3840 x 2176
 returned coded surface:    3840 x 2160 or 3840 x 2176
 negotiated visible crop:   3840 x 2160
-display target:            independently selected (1920 x 1080 in these runs)
+display target:            independently selected (1920 x 1080 in the original runs)
 ```
 
-The practical HEVC stream proved 4K60 decode and scaled presentation. A separate
-full-player control proved standard native 3840x2160 VideoOut and about 59.9 FPS
-HDR presentation, but used software decoding; keep that scanout evidence
-separate from Videodec2 performance. The hardware VP9 Profile 2 pipeline also
-completed 4K decode and HDR-target presentation, without new pixel-level HDR
-capture evidence.
+The practical HEVC stream proved 4K60 decode while scaling into the original
+1080p target. Later native presenter controls used a true 3840x2160 source and
+3840x2160 output for 600/600 frames at 119.87 FPS on firmware 6.02 and 119.88
+FPS on firmware 12.70. Live H.264 2160p/120 was also operator-accepted through
+VideoDec2, AGC, and native 4K output. Keep the controlled display result and the
+live product acceptance separate from the older HEVC decode timings. The
+hardware VP9 Profile 2 pipeline also completed 4K decode and HDR-target
+presentation, without new pixel-level HDR capture evidence.
 
 ## Codec selection guidance
 

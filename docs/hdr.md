@@ -165,6 +165,12 @@ metadata, peak luminance, or gamut accuracy. The AGC output target is also
 tiled/swizzled; a CPU-linear `y * width + x` address is not a valid pixel
 readback coordinate.
 
+The native 3840x2160/119.88 Hz result is an SDR fixed-source presentation proof
+and a live H.264 product acceptance. It does not by itself prove Main10/HDR at
+4K/120. HDR changes the decoded surface interpretation, shader conversion,
+framebuffer format, VideoOut state, and display metadata; repeat the complete
+measurement rather than inheriting the SDR result.
+
 ## What remains to prove
 
 - sustained 1080p60 network Main10/HDR with natural content;
@@ -173,7 +179,7 @@ readback coordinate.
 - live HDR-qualified UI/HUD composition;
 - 1440p and 4K HEVC Main10 decoder tuples and texture descriptors;
 - representative live VP9 Profile 2 HDR content and latency percentiles;
-- native 1440p/4K hardware-decoder-to-scanout integration and memory pressure;
+- native 1440p/4K Main10/HDR-to-scanout integration, including 119.88 Hz; and
 - display-side photometric and metadata verification.
 
 Do not expose larger Main10 modes by extrapolating the 1080p result.

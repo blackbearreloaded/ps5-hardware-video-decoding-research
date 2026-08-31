@@ -213,11 +213,14 @@ surface: 3840 x 2176 coded, pitch 3840
 picture: 3840 x 2160 visible
 ```
 
-Most decoder controls scale 1440p and 4K surfaces into a 1920x1080 VideoOut
-target. An independent full-player control used standard native 3840x2160
-VideoOut and held about 59.9 FPS for a 4K60 HDR presentation workload. Because
-that player decoded in software, the result proves scanout/presentation
-capacity only and must not be attributed to Videodec2.
+The original decoder controls scaled 1440p and 4K surfaces into a 1920x1080
+VideoOut target. Later ProsperoLight integration selected output geometry at
+the stream boundary: 1080p uses 1920x1080, 1440p is filtered into 3840x2160,
+and 2160p uses a 3840x2160 target 1:1. A true-4K-source oracle then presented
+600/600 frames through native 3840x2160 VideoOut at 119.87 FPS on firmware 6.02
+and 119.88 FPS on firmware 12.70. See
+[High-refresh and native 4K output](high-refresh-output.md) for the measurement
+boundary and live-stream acceptance.
 
 The presenter waits until `sceVideoOutGetFlipStatus()` observes its submitted
 marker. Reported presentation and callback-to-flip timing therefore includes
@@ -298,14 +301,13 @@ copied the complete current affine and enabled destination safe-area state; all
 source edges and chart regions were visible. Representative live-content
 acceptance remains a separate product test.
 
-The current linear-surface pixel shader also uses explicit integer raw-buffer
-loads. It selects one luma byte and one interleaved UV pair, with UV coordinates
-derived by halving the luma coordinates. That is point/nearest sampling, not a
-filtered chroma upsample or filtered high-resolution downscale. It is fast and
-preserves zero-copy, but it can alias fine detail and colored edges when 1440p
-or 4K surfaces are scaled into the 1080p target. This is a rendering-quality
-property, not an HEVC decode limitation. A filtered AGC candidate still needs a
-matched image-quality and presentation-cost experiment.
+The original linear-surface pixel shader used explicit integer raw-buffer
+loads: one luma byte and one interleaved UV pair with halved UV coordinates.
+That point-sampled path could alias fine detail when reducing 1440p or 4K to a
+1080p target. The later product presenter instead hardware-validated filtered
+1440p-to-4K sampling while keeping the decoder-to-AGC surface pointer unchanged.
+Sampling quality is a renderer property, not an HEVC decode limitation, and
+more bitrate cannot repair aliasing introduced after decode.
 
 ## Resource lifecycle
 
@@ -338,7 +340,8 @@ or 3840x2160 scanout buffers. It acts after compressed video has already been
 decoded. Decoder submission and output-ready timing end before a scanout buffer
 is registered or flipped, so this call cannot speed the codec engine.
 
-Native 4K scanout could avoid scaling into a 1080p target and improve final
-image quality or presentation workload. The independent full-player result
-confirms that public native 4K scanout is practical, but it remains a separate
-display result rather than a decoder optimization.
+Native 4K scanout avoids reducing a 4K source into a 1080p target and gives a
+1440p source one filtered scale into the physical 4K target. It is now proven
+at 59.94 and 119.88 Hz, including a true-4K-source 600-frame HFR control on two
+firmware versions. This remains a display/presentation result rather than a
+decoder optimization; codec capacity must still be measured separately.
