@@ -1,5 +1,45 @@
 # Benchmarks and measurement method
 
+For recent live diagnostics, see the [bounded klog probe contract](performance-probes.md).
+
+## Exploratory live HEVC 4K120 slice observations (September 2026)
+
+An experimental live-stream configuration requested and observed eight
+slices in HEVC Main SDR at 4K120 / 80 Mbps, with depth one and 119.88 Hz output.
+One session recorded 11,994 presented frames and 107 slice-layout samples,
+without recorded frame-number gaps, stale drops, receive errors, flip timeouts
+or audio errors. These counters do not establish zero packet loss or 120 FPS.
+
+The retained private summary compared four/eight-slice traces as follows:
+
+| Callback-relative interval | Four slices | Eight slices |
+|---|---:|---:|
+| 30–150 s: delivered FPS | 104.63 | 74.29 |
+| 30–150 s: mean decode | 6.485 ms | 5.455 ms |
+| 30–150 s: exact decode p99 | 8.877 ms | 6.832 ms |
+| 80–150 s: delivered FPS | 104.56 | 104.86 |
+| 80–150 s: mean decode | 6.834 ms | 5.426 ms |
+| 80–150 s: exact decode p99 | 8.672 ms | 6.867 ms |
+| 80–150 s: maximum receive interval | 22.921 ms | 72.318 ms |
+
+The later interval was selected retrospectively, not preregistered. The user
+subsequently confirmed Windows/RDP login and reconnect activity around gameplay;
+the first interval includes a roughly 30-second low-delivery region. Neither
+window supports a controlled percentage speedup, a cadence regression, or a
+stutter fix. Equal compressed-frame-size groups also suggested lower decode
+time, but equal byte count is not equal codec complexity.
+
+These are investigator summaries of private traces, not publicly reproducible
+raw benchmark fixtures. They are preliminary observations, not a reproducible
+benchmark baseline or a recommendation for application defaults.
+No new console experiment was performed for this publication.
+
+Interpretation: eight slices are a promising SDR decoder-headroom experiment,
+not a universal recommendation. Do not transfer the result to Main10/HDR,
+another encoder, or another resolution. The earlier H.264 1080p findings below
+remain distinct. Reduced decode time can coexist with unchanged FPS and larger
+delivery gaps; isolate those stages before changing decoder policy again.
+
 ## Do not compare unlike timings
 
 “Decode time” can refer to different boundaries. This research keeps four
@@ -315,7 +355,7 @@ capacity can be tested directly.
 | Firmware-12.70 native 4K HFR control | 3840x2160 / 3840x2160 | 600 | 119.88 FPS | 600/600; clean teardown |
 | CPU-regenerated loading control | 1920x1080 / 1920x1080 | 120 FPS | 109.33 FPS | Full-surface CPU generation/flush was the bottleneck |
 
-A live product session also accepted H.264 2160p/120 through Sunshine,
+A live streaming session also accepted H.264 2160p/120 through host negotiation,
 VideoDec2, AGC, and native 4K HFR output. It is recorded as operator acceptance,
 not as a controlled timing row, because a full decode-ready and
 callback-to-completed-flip distribution was not retained.
