@@ -248,6 +248,42 @@ and presenter descriptors before display.
 
 ## Optimizations worth keeping
 
+### Later product integration lessons (September 2026)
+
+The following changes are implemented in an experimental streaming path;
+they are not individually controlled speedup measurements:
+
+- Flush immutable GPU-visible state when initialized, then flush only the
+  mutable command/state ranges written for a frame. The product reduced that
+  repeated range from approximately 64 KiB to 22 KiB. Do not omit required
+  cache maintenance or generalize those byte counts to another renderer.
+- Overlap presentation with useful work only while retaining the decoded
+  source slot until its GPU/flip ownership ends. Keep shared shader-state banks
+  protected as well as image buffers. A timeout must not authorize reuse.
+- Treat delayed decoder output as a normal state in a deeper pipeline. Retain
+  FIFO input/output association, keep the pool bounded, and reset on errors.
+  Do not flush every no-output call and accidentally serialize the pipeline.
+  The measured configuration still uses decoder depth one; depth-two host mocks
+  establish bookkeeping behavior, not a hardware throughput benefit.
+- Avoid heap allocation in common small socket-poll sets, keeping a checked
+  fallback for larger sets. This removes allocation work but does not prove
+  that network polling caused the observed high-bitrate stalls.
+- Measure preparation, cache maintenance, submission, source-slot waits and
+  completion waits separately. Lower synchronous decoder time is not the same
+  as smoother completed presentation.
+
+The product has host-side checks for delayed output, pool wrap, bounded
+backlog/reset, source ownership after timeout, and socket stack/fallback paths.
+These tests complement, rather than replace, hardware validation. Failed
+teardown must retain resources still potentially in use rather than freeing
+them underneath the GPU; require application restart when recovery is unsafe.
+
+Eight-slice policy, shorter polling intervals, SIMD work and presentation overlap
+were combined in one experimental build. Do not attribute its subjective
+result to any one change without isolating that change. The current
+[probe protocol](performance-probes.md) keeps those settings fixed while locating
+the expensive stage.
+
 1. Exact decoder-to-AGC pointer reuse—already the largest memory-path win.
 2. Fixed rotating AU/frame pools and no per-frame allocation.
 3. Four H.264 slices at 1080p.
@@ -273,7 +309,8 @@ and presenter descriptors before display.
 - `sceVideoOutAddBuffer4k2kPrivilege` as a decoder optimization: display-buffer
   registration occurs after decode.
 - AV1 negotiation: no firmware-6.02 decoder backend.
-- 1440p HEVC Main10: not proven by the 1080p controlled result.
+- 1440p HEVC Main10: later product acceptance exists (see [HDR](hdr.md)), but
+  is not a controlled extension of the 1080p chart.
 - Alternate decoder resource classes: memory query alone did not make decoder
   creation available, so no performance comparison exists.
 
@@ -282,8 +319,9 @@ and presenter descriptors before display.
 1. Retain H.264 1080p60/four-slice/depth-one as the stable default.
 2. Offer HEVC Main at 1080p and 1440p, then 4K as beta until natural-gameplay
    soaks provide repeated latency percentiles.
-3. Add 1080p HEVC Main10/HDR as an explicit experimental session mode with SDR HUD
-   disabled and strict state/layout validation.
+3. Start Main10/HDR from the controlled 1080p contract and strict state/layout
+   validation. Later product acceptance includes larger modes and a readable
+   HDR HUD; qualify each independently rather than reusing SDR assumptions.
 4. Add VP9 Profile 0 behind strict superframe/show-frame handling; use four
    tiles as a measured 4K starting point.
 5. Treat VP9 Profile 2 4K as experimental until representative live content
