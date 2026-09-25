@@ -146,7 +146,7 @@ unavailable on two locked attempts before application launch.
 Independent full-player evidence first established native 3840x2160 VideoOut
 and about 59.9 FPS 4K60 HDR presentation with software decoding. The later
 native HFR oracles extended presentation evidence to a true 3840x2160 source
-at 119.88 Hz on firmware 6.02 and 12.70. ProsperoLight then operator-accepted
+at 119.88 Hz on firmware 6.02 and 12.70. Subsequent operator testing accepted
 live H.264 2160p/120 through VideoDec2 and AGC, but did not capture a controlled
 decode-to-completed-flip latency distribution for that session.
 
@@ -193,7 +193,7 @@ decode-to-completed-flip latency distribution for that session.
 - VP9 Profile 0/2 results use a small number of synthetic and natural streams;
   tile count, throughput, and latency policy are not universal encoder claims.
 - Firmware 12.70 portability is proven for the true-4K-source 119.88 Hz
-  presenter and ProsperoLight lifecycle, not for every decoder benchmark.
+  presenter and streaming lifecycle, not for every decoder benchmark.
 - The AV1 conclusion is firmware/API-specific and does not prove the SoC's
   transistor-level media-engine contents.
 

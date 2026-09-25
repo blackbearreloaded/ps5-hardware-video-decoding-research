@@ -1,5 +1,12 @@
 # PS5 Hardware Video Decoding Research
 
+September 2026 update: [later live-stream HDR acceptance](docs/hdr.md#later-live-stream-integration-acceptance-september-2026)
+extends the original controlled 1080p evidence. Successful rendering is not a
+claim of sustained 4K120 HDR performance or calibrated display output.
+The [live 4K120 HDR investigation](docs/live-4k120-investigation.md) records
+unresolved reports and the [bounded probe methodology](docs/performance-probes.md);
+[recent HEVC slice observations](docs/benchmarks.md) remain exploratory.
+
 [![Examples](https://github.com/blackbearreloaded/ps5-hardware-video-decoding-research/actions/workflows/examples.yml/badge.svg)](https://github.com/blackbearreloaded/ps5-hardware-video-decoding-research/actions/workflows/examples.yml)
 [![PS5 firmware 6.02 and 12.70](https://img.shields.io/badge/PS5_firmware-6.02%20%7C%2012.70-003791.svg)](docs/evidence.md)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
@@ -37,7 +44,7 @@ converts color, composites, scales, and renders into VideoOut framebuffers.
 | VP9 Profile 2 | Caller-owned low-aligned 10-bit output at 1080p/4K; four-tile 4K reached 170.51 FPS decode-only and completed 60 Hz HDR-target presentation |
 | AV1 | No usable firmware-6.02 decoder path found through the examined interfaces |
 | Native 4K scanout | 3840x2160 at 59.94 and 119.88 Hz; true-4K-source 120 Hz controls presented 600/600 frames on firmware 6.02 and 12.70 |
-| Live high refresh | H.264 streaming accepted at 1080p/120, 1440p/120, and 2160p/120; 1440p/90 and 2160p/120 negotiation also matched the Sunshine host |
+| Live high refresh | H.264 streaming accepted at 1080p/120, 1440p/120, and 2160p/120; 1440p/90 and 2160p/120 negotiation also matched the host |
 | CI | Builds and runs the host-side contract examples |
 
 Firmware interfaces and title capabilities can change. Firmware 6.02 remains
@@ -106,7 +113,7 @@ renders the surface into a scanout framebuffer.
 | VP9 Profile 2 | Controlled console proof | Low-aligned 10-bit 4:2:0 at 1080p and 2160p; caller-owned output and 4K HDR-target presentation |
 | AV1 | Unavailable through examined APIs | No usable decoder route was identified |
 | Native 4K scanout | Controlled console proof | 3840x2160 at 59.94 Hz and 119.88 Hz; true-4K-source 120 Hz controls passed on firmware 6.02 and 12.70 |
-| Live 4K/120 H.264 | Operator-accepted product path | Sunshine negotiation, VideoDec2 decode, AGC presentation, and native 4K HFR output worked together; no controlled decode-latency distribution was captured |
+| Live 4K/120 H.264 | Operator-accepted streaming path | Host negotiation, VideoDec2 decode, AGC presentation, and native 4K HFR output worked together; no controlled decode-latency distribution was captured |
 
 The AV1 result is an API and firmware conclusion. It does not prove the custom
 SoC physically lacks every possible AV1-capable circuit.
@@ -204,7 +211,7 @@ See [Minimal examples](examples/README.md) for the use-case mapping.
 | [Architecture and memory](docs/architecture.md) | Videodec2, AGC, VideoOut, memory ownership, zero-copy limits, and lifecycle |
 | [Codecs and resolutions](docs/codecs-and-resolutions.md) | Proven codec/profile/level tuples, pitches, coded sizes, and visible crops |
 | [Benchmarks](docs/benchmarks.md) | Controlled and live timing tables, pipeline depth, WPP, slices, and methodology |
-| [High-refresh and native 4K output](docs/high-refresh-output.md) | 90/120 FPS controls, native 4K/119.88 Hz VideoOut, live Sunshine acceptance, failure modes, and limits |
+| [High-refresh and native 4K output](docs/high-refresh-output.md) | 90/120 FPS controls, native 4K/119.88 Hz VideoOut, live-stream acceptance, failure modes, and limits |
 | [10-bit surfaces and HDR10](docs/hdr.md) | HEVC Main10/VP9 Profile 2 storage, title capability, BT.2020/PQ conversion, packing, and negotiation |
 | [Implementation guide](docs/implementation.md) | Minimal real-time streaming integration, validation, telemetry, errors, and rollout |
 | [Evidence and limits](docs/evidence.md) | Research snapshots, milestone map, confidence labels, and unproven areas |

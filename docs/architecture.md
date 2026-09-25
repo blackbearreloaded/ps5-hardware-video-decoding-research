@@ -214,7 +214,7 @@ picture: 3840 x 2160 visible
 ```
 
 The original decoder controls scaled 1440p and 4K surfaces into a 1920x1080
-VideoOut target. Later ProsperoLight integration selected output geometry at
+VideoOut target. Later streaming integration selected output geometry at
 the stream boundary: 1080p uses 1920x1080, 1440p is filtered into 3840x2160,
 and 2160p uses a 3840x2160 target 1:1. A true-4K-source oracle then presented
 600/600 frames through native 3840x2160 VideoOut at 119.87 FPS on firmware 6.02

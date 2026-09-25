@@ -171,7 +171,33 @@ and a live H.264 product acceptance. It does not by itself prove Main10/HDR at
 framebuffer format, VideoOut state, and display metadata; repeat the complete
 measurement rather than inheriting the SDR result.
 
-## What remains to prove
+## Later live-stream integration acceptance (September 2026)
+
+The preceding sections describe the original controlled experiment, not the
+current limit of the integration. Subsequent live-stream testing reported working
+live HEVC Main10 video at 1080p, 1440p, and 2160p, with the HDR metrics overlay
+visible after integration fixes. This is operator-reported live-product
+acceptance, not a replacement for the controlled chart or a quantified soak.
+
+The integration lessons are to keep component pitch separate from byte pitch,
+derive both plane views from the actual decoded surface, and update texture,
+render-target, viewport and VideoOut geometry together. Larger Main10 modes
+must not inherit a descriptor or output-size assumption from 1080p. Repeated
+images, stripes and partial-screen output are reasons to inspect those contracts
+before blaming network loss. These symptoms alone do not identify one cause.
+
+The product also resolved the solid-color HDR overlay symptom. That visual
+acceptance establishes readable composition, not calibrated paper white, HDR
+metadata correctness, or photometric equivalence to the source. The earlier
+SDR-shader HUD candidate above remains historical, not a prescription for the
+final implementation.
+
+These observations derive from operator feedback, not a published controlled fixture.
+In particular, rendering a 4K HDR stream while 120 FPS is selected does not
+establish sustained 120 completed frames per second. That workload remains an
+active performance investigation.
+
+## What remains to prove under controlled conditions
 
 - sustained 1080p60 network Main10/HDR with natural content;
 - decode and end-to-end latency percentiles under that workload;
@@ -182,4 +208,6 @@ measurement rather than inheriting the SDR result.
 - native 1440p/4K Main10/HDR-to-scanout integration, including 119.88 Hz; and
 - display-side photometric and metadata verification.
 
-Do not expose larger Main10 modes by extrapolating the 1080p result.
+Do not infer larger Main10 contracts from the 1080p chart alone. Preserve the
+distinction between the later product acceptance and controlled, repeatable
+layout/color/cadence measurements at each resolution.

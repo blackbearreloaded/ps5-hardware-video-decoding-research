@@ -17,7 +17,7 @@ Earlier isolated 1080p controls measured 89.99 FPS for a 90 FPS target and
 surface for every frame; the fixed-source presenter still reached 119.85 FPS.
 That comparison rules out a general 60 FPS GPU or VideoOut ceiling.
 
-The production integration subsequently accepted live H.264 Sunshine sessions
+The streaming integration subsequently accepted live H.264 sessions
 at 1080p/120, 1440p/120, and 2160p/120. Separate logs matched a 1440p/90 client
 request to a 90 Hz host capture and a 2160p/120 request to a 120 Hz host capture.
 This is end-to-end product acceptance, not a controlled decoder-latency
@@ -32,7 +32,7 @@ distribution.
 - AGC can render a true 3840x2160 source into native 3840x2160 scanout fast
   enough for the 119.88 Hz display interval in the tested fixed-source oracle.
 - The same presentation contract works on firmware 6.02 and 12.70.
-- VideoDec2, AGC, VideoOut, Moonlight protocol handling, audio, and input can
+- VideoDec2, AGC, VideoOut, streaming protocol handling, audio, and input can
   coexist in a live 2160p/120 H.264 session.
 
 The result does **not** prove that every codec, bitrate, encoder preset, frame
@@ -112,8 +112,8 @@ physical output geometry did not describe one consistent HFR configuration.
 ## Live-stream configuration
 
 Choose resolution, frame rate, codec, HDR state, and bitrate before launching
-the Sunshine application. If those settings change after returning to the
-launcher, stop the active Sunshine application and start a new session. A
+the host application. If those settings change after returning to the
+launcher, stop the active host application and start a new session. A
 resumed host capture can retain state from the previous negotiation even when
 the client has rebuilt its local decoder and presenter.
 
@@ -151,14 +151,13 @@ resource cleanup after stop/reconnect
 
 The most important distinction is between **presentation capacity** and
 **end-to-end stream capacity**. The 600-frame oracles prove native 4K/119.88 Hz
-presentation. The live ProsperoLight sessions prove that real streaming can use
+presentation. The live streaming sessions prove that real streaming can use
 that path. A controlled 4K/120 decoder-to-completed-flip soak across codecs and
 bitrates remains the next measurement needed for universal performance claims.
 
 ## Evidence boundary
 
-The HFR work used isolated authorized test titles and the independently
-developed [ProsperoLight](https://github.com/blackbearreloaded/ProsperoLight)
-client. This public document intentionally records semantic behavior and
+The HFR work used isolated authorized test titles and an independently
+developed streaming client. This document intentionally records semantic behavior and
 measurements, not private selector values, development title identifiers,
 signed artifacts, console addresses, or implementation extracts.
