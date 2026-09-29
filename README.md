@@ -286,8 +286,7 @@ See [PUBLICATION.md](PUBLICATION.md) for the publication boundary and
 Repository-authored documentation and examples are licensed under
 GPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
 
-This project was developed with assistance from OpenAI Codex. Project
-maintainers reviewed and validated the resulting documentation and examples.
+This project was developed with AI assistance from OpenAI and/or Anthropic tools.
 
 PlayStation and PS5 are trademarks of Sony Interactive Entertainment. This
 project is independent and is not affiliated with or endorsed by Sony.
