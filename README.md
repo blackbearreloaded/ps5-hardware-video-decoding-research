@@ -260,6 +260,8 @@ Evidence labels are intentionally narrow:
 
 ## External projects and references
 
+Thanks to John Törnblom (ps5-payload-dev) for the [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk), which much of the PS5 homebrew scene is built on.
+
 | Project or reference | Role |
 | --- | --- |
 | [FFmpeg](https://ffmpeg.org/) | Controlled H.264/HEVC/VP9 asset generation and bitstream inspection |
