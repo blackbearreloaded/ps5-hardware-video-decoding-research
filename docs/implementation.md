@@ -1,0 +1,324 @@
+# Minimal real-time streaming implementation guide
+
+## Design rule
+
+Use one decoder/presenter path with a small, explicit mode table. Codec,
+profile, level, maximum allocation geometry, accepted coded geometry, pitch,
+visible crop, and surface type belong to the mode. Do not build separate H.264
+and HEVC subsystems, and do not let an unexpected negotiated format silently
+fall through.
+
+The codec-specific [H.264](../examples/h264/modes.cpp),
+[HEVC](../examples/hevc/modes.cpp), and [VP9](../examples/vp9/modes.cpp) mode
+examples implement this idea without any PS5 dependency.
+
+## Session setup
+
+1. Read the user's exact codec, resolution, and HDR selection.
+2. Confirm the peer capability for that exact codec profile and bit depth.
+3. For HDR, require Main10, Rec.2020, limited range, active HDR state, and the
+   conditions documented in [HDR and Main10](hdr.md).
+4. Initialise the decoder.
+5. Query and allocate compute memory and its queue.
+6. Query decoder memory for the selected tuple; allocate every returned region
+   and frame size at runtime with 16 KiB alignment.
+7. Create/reset the decoder at pipeline depth one.
+8. Allocate fixed AU and caller-owned frame pools; do not allocate per frame.
+9. Initialize AGC once per process if necessary, then create one SDR-NV12 or
+   Main10-HDR presenter branch for the session.
+
+Request four H.264 slices at 1080p. For HEVC, ask the sender encoder for
+WPP where it exposes a suitable control, then verify the PPS flag. Keep both
+policies observable in telemetry. For VP9 4K, request four tile columns as the
+measured starting policy and verify the bitstream rather than trusting an
+encoder option name.
+
+Run network receive and access-unit assembly as a bounded producer independent
+of decode and completed-flip presentation. The measured serialized path lost no
+frames but accumulated receive backlog. Backpressure must be explicit; an
+unbounded jitter queue merely converts overload into latency.
+
+## Per-frame flow
+
+The following is intentionally pseudocode:
+
+`gather_in_order` is the one intentional per-frame CPU payload copy: it writes
+validated encoded fragments into an already mapped AU slot. `decoder.decode`
+receives that slot's address plus a free caller-owned frame-slot address.
+`present_same_pointer` must bind the decoder's returned frame address directly;
+it must not repack or upload the decoded planes. See the runnable
+[memory-pipeline contract](../examples/common/memory_pipeline.cpp).
+
+```cpp
+SubmitResult submit_access_unit(const EncodedAccessUnit& unit)
+{
+    auto& au_slot = input_pool.acquire();
+    auto& frame_slot = frame_pool.acquire();
+    if (!gather_in_order(unit.fragments, unit.total_bytes, au_slot)) {
+        return SubmitResult::needs_keyframe;
+    }
+
+    auto input = make_input(au_slot, unit.total_bytes, unit.pts);
+    pending.push(unit.frame_flags, frame_slot);
+    auto output = decoder.decode(input, frame_slot);
+    if (!output && pipeline_depth == 1) {
+        output = decoder.flush(frame_slot);
+    }
+    if (!output) {
+        return SubmitResult::queued;
+    }
+    if (!validate_output(selected_mode, *output, frame_pool)) {
+        return SubmitResult::needs_keyframe;
+    }
+
+    const auto completed = pending.pop_front();
+    if (completed.show_frame || completed.show_existing_frame) {
+        presenter.present_same_pointer(*output, selected_mode.visible_size);
+    }
+    return SubmitResult::accepted;
+}
+```
+
+Preserve the presentation timestamp for decoder input and telemetry. If output
+order can differ from input order, correlate by PTS.
+
+## Validation by surface type
+
+For 8-bit NV12:
+
+- require the selected AVC or HEVC Main codec;
+- require exact output width and pitch;
+- accept only the proven coded heights for that resolution;
+- compute UV base using returned pitch and coded height; and
+- crop/draw using visible dimensions.
+
+For 1080p Main10:
+
+- require the negotiated HEVC Main10 mode, width 1920,
+  coded height 1088, logical pitch 1920, and byte pitch 3840;
+- require returned bytes to fit the queried/aligned slot;
+- treat 16-bit components as low-aligned 10-bit; and
+- bind the exact returned pointer to the session's HDR descriptors.
+
+For VP9 Profile 2:
+
+- require the exact negotiated profile rather than inferring it from the
+  returned format field;
+- at 1080p require 1920 components / 3840 bytes of pitch;
+- at 4K require 3840 components / 7680 bytes of pitch;
+- interpret active words as low-aligned 10-bit two-plane 4:2:0; and
+- keep color space, range, and transfer as independent stream state.
+
+In every case, require one picture, no output error, and exact membership in the
+caller frame pool. A valid-looking pointer outside that pool breaks the proven
+ownership contract.
+
+## Queue-depth policy
+
+Depth one is the low-latency default and sustained the practical live 4K60
+test. At 90 and 120 FPS, compare repeated live depth-one p95/p99 against the
+11.11 and 8.34 ms frame periods respectively. Consider depth three only when
+the stream needs throughput headroom and the added residency is acceptable.
+
+If depth is greater than one:
+
+- permit queue-fill submissions with no output and no accepted frame;
+- track every pending input timestamp;
+- never reuse a slot still owned by an in-flight frame;
+- do not immediate-flush every no-output call;
+- drain repeatedly at end of stream; and
+- expect added residency even when submission calls become very short.
+
+Do not use depth as a cosmetic “performance mode.” Expose it only with actual
+ready-latency and throughput telemetry.
+
+## VP9 packet and display policy
+
+Split a VP9 compound superframe using its standard trailing index before
+submitting coded frames. The measured decoder rejected the compound packet as
+one access unit but accepted every split coded frame. Carry parsed `show_frame`
+and `show_existing_frame` state beside each queued timestamp:
+
+- submit hidden alternate-reference frames and suppress their presentation;
+- submit show-existing-frame commands and present the returned materialized
+  caller-owned output; and
+- correlate output to queued coded frames, not container packets.
+
+The [C++20 packetization example](../examples/vp9/packetization.cpp) implements
+the superframe-index split and display decision without platform dependencies.
+
+## Presentation selection
+
+Keep the established SDR presenter unchanged for H.264 and HEVC Main. Select a
+small HDR branch once for a Main10 session:
+
+| Session | Input interpretation | Matrix/transfer | AGC target | VideoOut |
+|---|---|---|---|---|
+| H.264 / HEVC Main SDR | 8-bit NV12 | Existing Rec.709 SDR conversion | 8:8:8:8 | Existing SDR format |
+| VP9 Profile 0 SDR | 8-bit two-plane | Selected stream matrix/transfer | 8:8:8:8 | Existing SDR format |
+| HEVC Main10 or VP9 Profile 2 HDR | Low-aligned 10-bit two-plane | Limited BT.2020 NCL, preserve PQ when signaled | 2:10:10:10 | Platform HDR 10-bit format |
+
+Recreate VideoOut only at a safe owner/session boundary. A protocol-level HDR
+control callback should record state, not destroy graphics resources from its
+callback thread.
+
+Select output geometry independently from decoder allocation:
+
+| Visible stream | Output target | Policy |
+|---:|---:|---|
+| 1920x1080 | 1920x1080 | Present 1:1 |
+| 2560x1440 | 3840x2160 | Filter once in AGC |
+| 3840x2160 | 3840x2160 | Present the visible picture 1:1 |
+
+The same geometry applies at 60, 90, and 120 FPS. Native 2560x1440 scanout is
+not established, while native 3840x2160 at 119.88 Hz is console-proven on
+console A and console B. See [High-refresh and native 4K output](high-refresh-output.md).
+
+## Presenter ownership and mapping
+
+Only one renderer should own VideoOut/AGC presentation during a transition.
+Keep the zero-copy decoder and presenter in the same process; do not pass a raw
+direct-memory offset to another process and treat it as a transferable handle.
+When the AGC command includes the display flip, do not submit a second explicit
+flip. Wait on the integrated flip's completion marker before releasing the
+decoded slot.
+
+Fully stop a launcher or loading renderer before opening the stream presenter,
+and join any animation worker before the first decoded frame or failed-setup
+teardown. A bounded 100 ms post-launcher settle removed an observed intermittent
+black handoff across four hardware cycles, but it is an integration mitigation,
+not a documented timing guarantee.
+
+Retain only process-global AGC initialization across sessions. Shaders, command
+memory, VideoOut buffers, and decoder/frame pools remain per-session resources
+and must still drain and release in dependency order.
+
+Keep source and destination transforms separate. Texture coordinates must cover
+the complete visible decoded rectangle. Aspect fitting and TV-safe margins
+belong to the destination viewport; applying a partial-view affine
+matrix to the source can crop valid pixels while every decoder and zero-copy
+check continues to pass.
+
+The proven raw-buffer shader uses integer point samples. Treat filtered chroma
+upsampling and 1440p/4K-to-1080p downscaling as a separate renderer experiment;
+compare a fixed edge/text chart and record presentation cost before changing a
+default. More bitrate cannot correct sampling aliasing introduced after decode.
+
+## Telemetry
+
+Capture cheap timestamps/counters in the hot path and publish aggregates
+outside it. Opening sockets or formatting large reports inside the decode or
+present callback consumed receive headroom in early tests.
+
+At minimum expose:
+
+```text
+codec/profile/bit depth, visible and coded dimensions, pitch
+slice count or HEVC WPP, pipeline depth
+compressed gather average/max
+decode submission average/max
+submission-to-ready average/min/max
+present average/max
+callback-to-completed-flip average/min/max
+pending maximum, presented FPS, drops/drains/errors
+decoder-to-pool-to-AGC pointer-identity result (diagnostic builds)
+network first-byte, AU-ready, queue residency, and receive backlog
+```
+
+Never label pipelined submission occupancy as hardware decode latency.
+
+## Error and transition policy
+
+Request a new keyframe on decoder errors, unexpected codec/layout, output
+pointer violations, or presenter failure. Keep the last valid surface owned
+until its GPU/flip work completes.
+
+Malformed VP9 input produced a decoder error, after which reset recovered on a
+known-good keyframe without process restart. Use that bounded recovery path:
+stop consuming dependent frames, reset, request a keyframe, and resume only
+after strict output validation succeeds.
+
+Keyframe-driven VP9 Profile 0 changes from 1080p to 4K and back succeeded in one
+decoder configured for the 4K maximum. Treat codec, profile, bit depth, and HDR
+changes as session reconfiguration boundaries. Resolution changes within a
+proven maximum may use a guarded fast path, but must update returned geometry
+and presenter descriptors before display.
+
+## Optimizations worth keeping
+
+### Later integration lessons (September 2026)
+
+The following changes are implemented in an experimental streaming path;
+they are not individually controlled speedup measurements:
+
+- Flush immutable GPU-visible state when initialized, then flush only the
+  mutable command/state ranges written for a frame. The client reduced that
+  repeated range from approximately 64 KiB to 22 KiB. Do not omit required
+  cache maintenance or generalize those byte counts to another renderer.
+- Overlap presentation with useful work only while retaining the decoded
+  source slot until its GPU/flip ownership ends. Keep shared shader-state banks
+  protected as well as image buffers. A timeout must not authorize reuse.
+- Treat delayed decoder output as a normal state in a deeper pipeline. Retain
+  FIFO input/output association, keep the pool bounded, and reset on errors.
+  Do not flush every no-output call and accidentally serialize the pipeline.
+  The measured configuration still uses decoder depth one; depth-two host mocks
+  establish bookkeeping behavior, not a hardware throughput benefit.
+- Avoid heap allocation in common small socket-poll sets, keeping a checked
+  fallback for larger sets. This removes allocation work but does not prove
+  that network polling caused the observed high-bitrate stalls.
+- Measure preparation, cache maintenance, submission, source-slot waits and
+  completion waits separately. Lower synchronous decoder time is not the same
+  as smoother completed presentation.
+
+The client has host-side checks for delayed output, pool wrap, bounded
+backlog/reset, source ownership after timeout, and socket stack/fallback paths.
+These tests complement, rather than replace, hardware validation. Failed
+teardown must retain resources still potentially in use rather than freeing
+them underneath the GPU; require application restart when recovery is unsafe.
+
+Eight-slice policy, shorter polling intervals, SIMD work and presentation overlap
+were combined in one experimental build. Do not attribute its subjective
+result to any one change without isolating that change. The current
+[probe protocol](performance-probes.md) keeps those settings fixed while locating
+the expensive stage.
+
+1. Exact decoder-to-AGC pointer reuse—already the largest memory-path win.
+2. Fixed rotating AU/frame pools and no per-frame allocation.
+3. Four H.264 slices at 1080p.
+4. HEVC WPP on the sender when available.
+5. Four VP9 tile columns for the tested 4K policy, remeasured per encoder.
+6. Separate bounded network receive and decode/present ownership.
+7. Depth one when live decode fits the frame budget.
+8. No synchronous development telemetry in callbacks.
+9. Coded/visible geometry separation to avoid copies or rejection of valid
+   aligned surfaces.
+10. Resolution-aware VideoOut targets, with native 4K retained at high refresh.
+11. Bitrate tuned per codec/content/network rather than maximized globally.
+
+## Ideas rejected or deferred
+
+- Unconditional deep pipelines: more throughput, substantially more latency.
+- Eight H.264 slices at 1080p: tiny extra decode gain, about 9% more network
+  work, no completed-flip improvement.
+- CPU repack/upload: defeats the caller-owned direct-surface contract.
+- Native 4K buffer registration as a decoder optimization: display-buffer
+  registration occurs after decode.
+- AV1 negotiation: no AV1 decode has been proven.
+- 1440p HEVC Main10: later live acceptance exists (see [HDR](hdr.md)), but
+  is not a controlled extension of the 1080p chart.
+
+## Suggested rollout order
+
+1. Retain H.264 1080p60/four-slice/depth-one as the stable default.
+2. Offer HEVC Main at 1080p and 1440p, then 4K as beta until live-content
+   soaks provide repeated latency percentiles.
+3. Start Main10/HDR from the controlled 1080p contract and strict state/layout
+   validation. Later live acceptance includes larger modes and a readable
+   HDR HUD; qualify each independently rather than reusing SDR assumptions.
+4. Add VP9 Profile 0 behind strict superframe/show-frame handling; use four
+   tiles as a measured 4K starting point.
+5. Treat VP9 Profile 2 4K as experimental until representative live content
+   and display-side HDR correctness are accepted.
+6. Offer 90/120 FPS only with bounded queues, completed-flip telemetry, and a
+   wired-network recommendation; tune bitrate per configuration.
+7. Keep native 4K VideoOut selection separate from decoder policy.

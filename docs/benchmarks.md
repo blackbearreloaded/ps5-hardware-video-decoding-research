@@ -1,0 +1,393 @@
+# Benchmarks and measurement method
+
+For recent live diagnostics, see the [bounded development-log probe contract](performance-probes.md).
+
+## Exploratory live HEVC 4K120 slice observations (September 2026)
+
+An experimental live-stream configuration requested and observed eight
+slices in HEVC Main SDR at 4K120 / 80 Mbps, with depth one and 119.88 Hz output.
+One session recorded 11,994 presented frames and 107 slice-layout samples,
+without recorded frame-number gaps, stale drops, receive errors, flip timeouts
+or audio errors. These counters do not establish zero packet loss or 120 FPS.
+
+The summary compared four/eight-slice traces as follows:
+
+| Callback-relative interval | Four slices | Eight slices |
+|---|---:|---:|
+| 30–150 s: delivered FPS | 104.63 | 74.29 |
+| 30–150 s: mean decode | 6.485 ms | 5.455 ms |
+| 30–150 s: exact decode p99 | 8.877 ms | 6.832 ms |
+| 80–150 s: delivered FPS | 104.56 | 104.86 |
+| 80–150 s: mean decode | 6.834 ms | 5.426 ms |
+| 80–150 s: exact decode p99 | 8.672 ms | 6.867 ms |
+| 80–150 s: maximum receive interval | 22.921 ms | 72.318 ms |
+
+The later interval was selected retrospectively, not preregistered. Sender
+login and reconnect activity occurred around the session;
+the first interval includes a roughly 30-second low-delivery region. Neither
+window supports a controlled percentage speedup, a cadence regression, or a
+stutter fix. Equal compressed-frame-size groups also suggested lower decode
+time, but equal byte count is not equal codec complexity.
+
+These are investigator summaries, not publicly reproducible
+raw benchmark fixtures. They are preliminary observations, not a reproducible
+benchmark baseline or a recommendation for application defaults.
+No new console experiment was performed for this publication.
+
+Interpretation: eight slices are a promising SDR decoder-headroom experiment,
+not a universal recommendation. Do not transfer the result to Main10/HDR,
+another encoder, or another resolution. The earlier H.264 1080p findings below
+remain distinct. Reduced decode time can coexist with unchanged FPS and larger
+delivery gaps; isolate those stages before changing decoder policy again.
+
+## Do not compare unlike timings
+
+“Decode time” can refer to different boundaries. This research keeps four
+primary measurements separate:
+
+| Measurement | Start | End | What it means |
+|---|---|---|---|
+| Submission-call duration | Immediately before the decode call | API return | CPU/API occupancy; equals ready latency only for a synchronous depth-one call |
+| Submission-to-output-ready | Submission/callback timestamp | Call that returns the correlated output | Per-frame decoder pipeline residency |
+| Sustained decode-only throughput | First batch submission | Final drained output | Capacity with multiple frames in flight |
+| Callback-to-completed-flip | Encoded-frame callback arrival | Submitted VideoOut marker observed complete | Gather + decode residency + AGC + display pacing |
+| Network first-byte to AU-ready | First framing byte received | Complete encoded access unit available | Transport and access-unit assembly only |
+
+Compressed gather and presenter duration are useful secondary metrics.
+Presenter duration includes waiting for the observed flip marker, so it is not
+an isolated shader microbenchmark.
+
+At pipeline depth one, submission duration and output-ready latency are nearly
+the same. At depth three, a 0.333 ms submission can correspond to 33.710 ms
+until that frame is ready. Reporting only the first number would be misleading.
+
+## Matched H.264 versus HEVC
+
+These controlled streams used pipeline depth
+one, progressive 8-bit 4:2:0, and serialized decode/present cadence. Values are
+steady averages after excluding the cold first decode. H.264 includes its
+average immediate flush because the tested H.264 streams needed one and the
+HEVC streams did not.
+
+| Matched workload | Approx. encoded rate | HEVC decode | H.264 decode + flush | HEVC relative to H.264 | Serialized cadence |
+|---|---:|---:|---:|---:|---:|
+| 1080p low entropy | 0.29 Mb/s | 2.554 ms | 1.621 ms | 57.56% slower | 59.93 FPS |
+| 1080p `testsrc2` | 18 Mb/s | 5.841 ms | 6.396 ms | 8.68% faster | 59.94 FPS |
+| 1440p `testsrc2` | 31.6 Mb/s | 9.872 ms | 9.405 ms | 4.97% slower | 59.93–59.94 FPS |
+| 4K `testsrc2` | 71.7 Mb/s | 20.660 ms | 19.269 ms | 7.22% slower | 29.96–29.97 FPS |
+
+The codec winner changes with content. HEVC is not intrinsically cheaper to
+decode on this path. Its value is generally better compression at a
+quality target, which this equal-rate control deliberately does not measure.
+
+The approximately 2 ms H.264 observation is consistent with these results:
+low-complexity and slice-parallel live streams can be near that value, while a
+high-entropy matched stream can take materially longer.
+
+## Controlled VP9 resolution scaling
+
+A matched series of locally generated 60-frame VP9 Profile 0 `testsrc2` streams
+was decoded at pipeline depth one, without pacing
+or presentation. Every access unit was accepted and returned one valid,
+error-free picture in the caller-owned frame allocation. Decode returned output
+directly; no flushes were required.
+
+| Resolution | Encoded bytes | Cold call | Steady average | Steady range | Whole-batch throughput |
+|---:|---:|---:|---:|---:|---:|
+| 1920x1080 | 1,854,464 | 19.921 ms | 5.533 ms | 4.892–6.726 ms | 173.09 FPS |
+| 2560x1440 | 3,207,727 | 23.625 ms | 8.617 ms | 7.467–11.870 ms | 112.69 FPS |
+| 3840x2160 | 7,283,643 | 51.692 ms | 17.407 ms | 15.164–22.425 ms | 55.57 FPS |
+
+Batch durations were 346.631 ms, 532.401 ms, and 1,079.700 ms respectively.
+They include compressed-payload copies and loop overhead; steady averages
+exclude the first call. The 1080p and 1440p controls have ample 60 FPS decode
+headroom. The single-tile, depth-one 4K control falls short at 55.57 FPS.
+
+This is a matched resolution series, not a matched codec comparison. It does
+not include rendering, display pacing, or network latency. The next controls
+isolated VP9 tile layout and decoder pipeline depth.
+
+## VP9 4K tile-layout and pipeline controls
+
+The tile-layout control repeated the 4K depth-one run while changing only the
+libvpx tile-column setting. `tile-columns=2` produced four tile columns
+(`tile_cols_log2=2`). Header tracing verified the setting before the console
+run.
+
+| Tile columns | Encoded bytes | Cold call | Steady average | Steady range | Batch duration | Throughput |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 7,283,643 | 51.692 ms | 17.407 ms | 15.164–22.425 ms | 1,079.700 ms | 55.57 FPS |
+| 4 | 7,288,350 | 27.323 ms | 12.376 ms | 10.559–15.601 ms | 758.503 ms | 79.10 FPS |
+
+The tiled asset was only 0.06% larger, while steady decode time fell 28.90%
+and throughput rose 42.34%. This establishes a material tile-parallel benefit
+for the tested stream; it is not a universal optimum for every VP9 encoder,
+resolution, or content type.
+
+The pipeline control then reused the exact four-tile bytes and changed only
+decoder depth from one to three. The depth-three harness kept distinct bounded
+input/frame slots, accepted output-free fill calls, correlated FIFO output to
+submission timestamps, and drained the final outputs.
+
+| Depth | Output split | Submission average / median | Ready average / median / p95 | Complete span | Throughput |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 60 decode / 0 drain | 12.376 ms steady average | synchronous; not separately timestamped | 758.503 ms | 79.10 FPS |
+| 3 | 58 decode / 2 drain | 5.185 / 4.633 ms | 15.844 / 15.082 / 21.571 ms | 320.172 ms | 187.39 FPS |
+
+Maximum pending depth was three. All 60 access units and frame buffers were
+accepted; all outputs passed codec, geometry, error, picture-count, and
+caller-pool validation. Depth three reduced complete batch time by 57.79% and
+raised throughput by 136.90%. The result also demonstrates why a fast
+submission return is not the same as low output-ready latency.
+
+These are single, unpaced, decode-only runs of synthetic content. The
+depth-three ready maximum was 38.205 ms, and its p95 exceeded one 60 Hz frame
+interval. Client policy must therefore balance throughput against residency
+using representative live streams and callback-to-present measurements.
+
+## VP9 4K decode-to-completed-flip control
+
+The presentation control reused the exact four-tile 4K stream and the proven
+depth-one decoder tuple. Each decoded caller-owned surface was bound directly
+as the presenter's two-plane source, submitted, and held until VideoOut
+reported the corresponding completed flip. The next access unit became ready
+only after that observation, so this is a serialized, display-paced result.
+
+| Steady interval, frames 1–59 | Average | Median | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Compressed access-unit copy | 0.015 ms | 0.016 ms | 0.025 ms | 0.025 ms |
+| Decoder submission call | 12.311 ms | 12.012 ms | 15.231 ms | 15.674 ms |
+| Submission to output ready | 12.311 ms | 12.012 ms | 15.231 ms | 15.674 ms |
+| Present call to completed flip | 4.347 ms | 4.616 ms | 5.831 ms | 6.009 ms |
+| AU ready to completed flip | 16.676 ms | 16.682 ms | 16.701 ms | 16.716 ms |
+
+The 59 steady frames spanned 984.003 ms, equivalent to 59.95 FPS. The first
+frame took 60.778 ms end to end because it included decoder warm-up, presenter
+allocation and initialization, setup telemetry, and the first flip. Including
+that cold frame, all 60 frames spanned 1,044.783 ms, or 57.42 FPS.
+
+At depth one, the tested decoder returned the corresponding picture from the
+submission call, so call duration and output-ready latency are numerically
+equal. The 4.347 ms presentation interval is mostly the remaining wait to a
+60 Hz completed flip; it is not an isolated shader execution time. The
+AU-ready boundary excludes network reception, packet assembly, and callback
+scheduling, so it must not be relabeled as a live network callback result.
+
+This controlled test validates complete 4K VP9 surface presentation and steady
+60 Hz cadence. It does not replace the 187.39 FPS depth-three decode-capacity
+result or establish representative live-stream latency.
+
+## VP9 Profile 2, endurance, and LAN controls
+
+Profile 2 returned a caller-owned two-plane surface with low-aligned 10-bit
+components. The matched 4K capacity pair used the same four-tile 60-frame
+stream and changed only decoder depth.
+
+| Profile 2 4K control | Output split | Submission | Output-ready | Throughput/cadence |
+|---|---:|---:|---:|---:|
+| Depth 1, decode-only | 60 / 0 | 13.267 ms median | Synchronous; 16.839 ms p95 | 72.37 FPS batch |
+| Depth 3, decode-only | 58 / 2 | 4.690 ms median | 16.567 ms median | 170.51 FPS batch |
+| Depth 3, paced HDR-target presentation | 58 / 2 | 0.401 ms average | 33.506 ms average | 59.53 FPS; 40.483 ms AU-ready-to-flip |
+
+The completed-flip case used three rotating caller-owned slots. Its deeper
+pipeline preserved 60 Hz display cadence but increased residency, so the
+40.483 ms result must not be compared with a depth-one submission call.
+
+A locally encoded non-synthetic-video Profile 0 control repeated the exact
+four-tile depth-three bytes three times:
+
+| Run | Throughput | Submission median | Output-ready median |
+|---:|---:|---:|---:|
+| 1 | 288.71 FPS | 1.589 ms | 9.361 ms |
+| 2 | 278.44 FPS | 2.444 ms | 9.286 ms |
+| 3 | 287.01 FPS | 2.052 ms | 9.387 ms |
+
+Median throughput was 287.01 FPS and maximum-to-minimum spread was 3.6% of the
+median. A ten-minute extension submitted 36,000 paced 4K60 frames with no
+full-frame deadline misses and 135 us maximum scheduling lateness. Submission
+occupancy averaged 0.326 ms and peaked at 1.068 ms. These sample-specific
+results demonstrate sustained headroom; they are not a universal VP9 rate.
+
+The real-LAN control sent the exact Profile 2 4K stream as 60 length-framed
+access units at 16,667 us cadence. All 7,315,255 payload bytes, 60 decoder
+outputs, and 60 completed flips arrived without loss or lifecycle error.
+
+| LAN boundary | Result |
+|---|---:|
+| Connect to first HTTP response byte | 1.132 ms |
+| First framing byte to complete AU | 0.266 ms average / 2.815 ms maximum |
+| AU ready to completed flip | 50.066 ms average |
+| First framing byte to completed flip | 50.332 ms average |
+| Serialized batch cadence | 55.91 FPS |
+
+That probe deliberately put receive, decode, and completed-flip presentation
+on one thread. It accumulated 85.917 ms behind the sender's schedule despite
+losing no frames. This is evidence for a separate receive/jitter-buffer
+producer feeding a bounded decoder queue, not evidence that the LAN itself
+needed 50 ms to deliver each access unit.
+
+## H.264 live slice tuning at 1080p60
+
+All three runs used the same depth-one live architecture. The sender's encoder
+was asked to divide each frame into slices for decoder parallelism.
+
+| Sender H.264 policy | Videodec2 average | Immediate flush | Callback-to-decode | Callback-to-flip | Delivered cadence |
+|---|---:|---:|---:|---:|---:|
+| Single slice | 4.761 ms | not separately compared here | 4.861 ms | 16.686 ms | 60.03 FPS |
+| Four slices | 2.268 ms | 0.096 ms | 2.372 ms | 16.684 ms | 60.00 FPS |
+| Eight slices | 2.069 ms | — | — | 16.681 ms | 59.89 FPS |
+
+Four slices cut the core decode average by 52.4% relative to the single-slice
+run. Eight slices saved only 0.199 ms more, increased compressed bytes and
+network fragments by about 9%, and slightly reduced delivered cadence. Four
+slices are therefore the evidence-backed 1080p default. Higher resolutions
+should be measured independently before reusing that count.
+
+The display number stayed near one 60 Hz interval. The decode improvement adds
+headroom and reduces risk; it cannot make a vblank-paced completed flip occur
+in 2 ms.
+
+## Renderer integration controls
+
+Two application-integration experiments changed renderer behavior without
+changing the decoder mode:
+
+| Control | Frames | Videodec2 average | Callback-to-flip average | Result |
+|---|---:|---:|---:|---|
+| Four-slice H.264 baseline, no HUD | 3,700 | 2.268 ms | 16.684 ms | Reference |
+| Same architecture with in-band SDR HUD | 1,661 | 2.312 ms | 16.689 ms | No meaningful regression in this bounded comparison |
+
+The HUD regenerated a small 8-bit NV12 text surface every 15 frames and drew it
+after the video quad in the existing AGC command buffer. It added one draw, but
+no decoded-surface copy, CPU readback, or second GPU submission. The 0.005 ms
+callback-to-flip difference is smaller than these single-run experiments can
+attribute confidently; this is evidence that the design preserved the latency
+class, not a claim that the extra draw costs exactly 0.005 ms.
+
+An earlier 90-frame presentation control submitted AGC's integrated flip and
+then issued another explicit VideoOut flip. It sustained 29.97 FPS. Removing
+only the second flip restored 59.93 FPS with the same decoder-to-AGC pointer
+identity. The extra flip was display pacing overhead, not decoder cost.
+
+A separate reconnect test confirmed that AGC must be initialized once per
+process. After retaining the initial state, two consecutive sessions presented
+909/909 and 553/553 frames at 13.515 ms and 13.502 ms average
+callback-to-completed-flip latency. Reinitializing AGC had previously allowed
+the second session to decode 671 access units but present none.
+
+Finally, a UI-renderer-to-AGC VideoOut handoff mitigation was followed by four
+visible cycles at 59.89, 60.18, 60.23, and 59.94 FPS. Decode remained about
+2.29 ms and callback-to-flip about 16.7 ms. That control isolates renderer
+ownership from decoder performance; it does not establish a universal 100 ms
+handoff requirement.
+
+## HEVC 4K pipeline-depth and WPP experiment
+
+The controlled input was a deterministic 30-frame 3840x2160 `testsrc2` HEVC
+Main Level 5.1 stream at roughly 72 Mb/s with no B frames. Except for the WPP
+row, the bytes were identical. These averages include the cold call because
+the queue-depth study compared complete batches.
+
+| Depth | WPP | Submission avg | Output-ready avg | Whole-batch throughput | Interpretation |
+|---:|---:|---:|---:|---:|---|
+| 1 | Off | 20.719 ms | 20.719 ms | 47.94 FPS | Synchronous reference |
+| 3 | Off | 7.462 ms | 22.993 ms | 128.39 FPS | Throughput headroom, more residency |
+| 6 | Off | 4.551 ms | 32.570 ms | 176.91 FPS | Highest tested throughput, still more residency |
+| 3 | On | 5.212 ms | 16.601 ms | 174.89 FPS | Strong sender bitstream optimization |
+
+Depth three raised batch throughput 2.68x over depth one without making
+individual frames ready sooner. Depth six reached 3.69x throughput but
+raised average ready latency another 9.577 ms over depth three.
+
+The WPP-enabled stream was 1.17% larger yet improved depth-three batch
+throughput by 36.2%, reduced submission occupancy by 30.2%, and reduced ready
+latency by 27.8%. Its PPS explicitly had
+`entropy_coding_sync_enabled_flag = 1`; do not assume an encoder preset enabled
+WPP without checking the bitstream.
+
+## Practical live HEVC 4K60
+
+The sender encoder was asked for HEVC Main, 3840x2160 at 60 FPS and a 150 Mb/s
+cap. The actual payload was about 12 Mb/s, no B frames, and WPP off. AGC scaled
+the 4K decoded surface into the existing 1920x1080 VideoOut target.
+
+| Measurement | Depth 1 | Depth 3 |
+|---|---:|---:|
+| Access units entering decoder | 725 | 724 |
+| Frames reaching completed flip | 725 | 722; two remained queued at timed shutdown |
+| Cadence | 60.36 FPS | 60.10 FPS |
+| Compressed gather average | 0.005 ms | 0.005 ms |
+| Decode submission average | 5.464 ms | 0.333 ms |
+| Submission/callback to output-ready average | 5.472 ms | 33.710 ms |
+| Presenter average, including flip observation | 11.223 ms | 16.346 ms |
+| Callback to completed flip average | 16.698 ms | 50.059 ms |
+| Callback to completed flip maximum | 34.455 ms | 61.250 ms |
+
+Depth one sustained the same practical cadence while reducing ready latency by
+83.77% and callback-to-flip latency by 66.64%. It is the correct low-latency
+default for this workload. Depth three is an opt-in headroom policy for a
+stream whose depth-one percentiles threaten 16.67 ms.
+
+Do not compare the live 5.464 ms and controlled 20.719 ms results without the
+approximately 12 versus 72 Mb/s payload and content-complexity difference.
+
+## High-refresh and native 4K presentation
+
+These rows measure presenter cadence, not isolated codec-engine time. The
+fixed-source controls remove network and decode variability so VideoOut and AGC
+capacity can be tested directly.
+
+| Workload | Source / output | Requested frames | Measured cadence | Result |
+|---|---|---:|---:|---|
+| Console A 1080p HFR control | 1920x1080 / 1920x1080 | 90 FPS | 89.99 FPS | All requested frames presented |
+| Console A 1080p HFR control | 1920x1080 / 1920x1080 | 120 FPS | 119.85 FPS | All requested frames presented |
+| Console A native 4K HFR control | 3840x2160 / 3840x2160 | 600 | 119.87 FPS | 600/600; clean teardown |
+| Console B native 4K HFR control | 3840x2160 / 3840x2160 | 600 | 119.88 FPS | 600/600; clean teardown |
+| CPU-regenerated loading control | 1920x1080 / 1920x1080 | 120 FPS | 109.33 FPS | Full-surface CPU generation/flush was the bottleneck |
+
+A live streaming session also accepted H.264 2160p/120 through sender negotiation,
+VideoDec2, AGC, and native 4K HFR output. It is recorded as operator acceptance,
+not as a controlled timing row, because a full decode-ready and
+callback-to-completed-flip distribution was not retained.
+
+At 90 FPS the frame period is 11.11 ms; at the platform's 119.88 Hz mode it is
+about 8.34 ms. The practical roughly 12 Mb/s HEVC 4K stream's 5.464 ms average
+synchronous decode fits inside the latter average budget, but its 34.455 ms
+callback-to-flip maximum does not. The controlled roughly 72 Mb/s stream's
+20.719 ms depth-one decode also exceeds the budget. Native 4K/120 presentation
+therefore does not make 4K/120 decode universal: bitrate, frame structure,
+content, encoder policy, queueing, and tail latency still decide whether a live
+stream is smooth.
+
+See [High-refresh and native 4K output](high-refresh-output.md) for output
+geometry, HDMI transition behavior, and the live-stream tuning checklist.
+
+## Why mini-PC and media-box numbers can look lower
+
+Published decoder figures often measure API submission, asynchronous GPU/media
+queue occupancy, or decode-only throughput rather than submission-to-ready or
+presented latency. They may also use lower-complexity streams, deeper queues,
+more parallel slices/tiles, different power classes, or omit vblank.
+
+The PS5 results reproduce the same phenomenon: depth-three submission was only
+0.333 ms, but the frame was ready after 33.710 ms. Conversely, the practical
+depth-one 4K stream really did decode synchronously in 5.464 ms. A platform
+comparison is meaningful only when codec profile, resolution, bitrate/content,
+frame structure, queue depth, and timing endpoints match.
+
+## Benchmark checklist
+
+Record these fields with every result:
+
+- codec, profile, bit depth, chroma format, level, and exact negotiated format;
+- visible resolution, coded surface size, pitch, and display target;
+- encoded bitrate/bytes, encoder preset, B-frame count, slices, tiles, and WPP;
+- decoder configuration and pipeline depth;
+- cold-call inclusion/exclusion and sample count;
+- gather, submission, ready, drain, presentation, and completed-flip timing;
+- frame count, sustained interval, pending maximum, dropped/drained frames;
+- output validity, error state, and caller-pool pointer identity; and
+- whether the run is controlled synthetic content or practical live content.
+
+The small [timing example](../examples/common/timing_model.cpp) shows the definitions
+on a normal host compiler.

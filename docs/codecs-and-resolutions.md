@@ -1,0 +1,165 @@
+# Codecs and resolutions
+
+## Known-good configurations
+
+Pipeline depth is a latency policy; depth one is the default.
+
+The table uses permissive client configuration bounds. A bitstream may signal
+a lower level than the configured maximum.
+
+| Mode | Profile | Max level | Config maximum | Accepted coded output | Visible picture | Pitch |
+|---|---:|---:|---:|---:|---:|---:|
+| H.264 1080p | High | 5.1 | 1920x1088 | 1920x1088 | 1920x1080 | 2048 bytes |
+| H.264 1440p | High | 5.1 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
+| H.264 2160p | High | 5.2 | 3840x2176 | 3840x2160 | 3840x2160 | 3840 bytes |
+| HEVC Main 1080p | Main | 4.1 | 1920x1088 | 1920x1088 | 1920x1080 | 2048 bytes |
+| HEVC Main 1440p | Main | 5.0 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
+| HEVC Main 2160p | Main | 5.1 | 3840x2176 | 3840x2160 or 2176 | 3840x2160 | 3840 bytes |
+| HEVC Main10 1080p | Main10 | 4.1 | 1920x1088 | 1920x1088 | 1920x1080 | 1920 components / 3840 bytes |
+| VP9 1080p | Profile 0 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 2048 bytes |
+| VP9 1440p | Profile 0 | 5.0 | 2560x1440 | 2560x1440 | 2560x1440 | 2560 bytes |
+| VP9 2160p | Profile 0 | 5.1 | 3840x2160 | 3840x2160 | 3840x2160 | 3840 bytes |
+| VP9 1080p | Profile 2 | 4.1 | 1920x1080 | 1920x1080 | 1920x1080 | 1920 components / 3840 bytes |
+| VP9 2160p | Profile 2 | 5.1 | 3840x2160 | 3840x2160 | 3840x2160 | 3840 components / 7680 bytes |
+
+The console-validated AVC/HEVC 8-bit modes return NV12. The Main10 mode returns
+a two-plane 4:2:0 surface with low-aligned 10-bit values in 16-bit words. The
+returned format field did not distinguish the tested 8-bit and 10-bit paths,
+so negotiation, byte pitch, dimensions, and buffer size must select the texture
+interpretation. Controlled VP9 presentation validated both the 8-bit Profile 0
+and low-aligned 10-bit Profile 2 two-plane paths.
+
+## Resolution-specific observations
+
+### 1080p
+
+The hardware's coded surface is 1920x1088 while the visible image is
+1920x1080. Eight padded lines belong to the surface layout. For 8-bit modes,
+pitch is 2048 bytes, not visible width. For Main10, pitch is 1920 components
+and `pitch_bytes` is 3840.
+
+H.264 at four slices is the accepted low-latency baseline. The live
+run averaged 2.268 ms inside Videodec2 plus a 0.096 ms immediate flush.
+
+### 1440p
+
+Both H.264 High and HEVC Main returned 2560x1440 with pitch 2560. Controlled
+depth-one decode averaged 9.405 ms for H.264 including flush and 9.872 ms for
+HEVC, leaving synchronous room inside a 16.67 ms 60 Hz interval for those
+particular streams.
+
+The original decoder test presented by scaling into a 1920x1080 VideoOut
+target. The later streaming path retained the 2560x1440 decoded surface and used
+filtered AGC scaling into a 3840x2160 target at both standard and high refresh.
+Native 2560x1440 scanout itself remains unproven.
+
+### 2160p / 4K
+
+Configure the maximum as 3840x2176. Controlled H.264 and HEVC files returned a
+3840x2160 surface, while the practical live HEVC stream returned
+3840x2176 coded with 2160 visible lines. All used pitch 3840 and all are valid
+observations for their exact codec/workload.
+
+Never make one returned height universal. Keep at least these fields separate:
+
+```text
+allocation/config maximum: 3840 x 2176
+returned coded surface:    3840 x 2160 or 3840 x 2176
+negotiated visible crop:   3840 x 2160
+display target:            independently selected (1920 x 1080 in the original runs)
+```
+
+The practical HEVC stream proved 4K60 decode while scaling into the original
+1080p target. Later native presenter controls used a true 3840x2160 source and
+3840x2160 output for 600/600 frames at 119.87 FPS on console A and 119.88
+FPS on console B. Live H.264 2160p/120 was also operator-accepted through
+VideoDec2, AGC, and native 4K output. Keep the controlled display result and the
+live acceptance separate from the older HEVC decode timings. The
+hardware VP9 Profile 2 pipeline also completed 4K decode and HDR-target
+presentation, without new pixel-level HDR capture evidence.
+
+## Codec selection guidance
+
+H.264 is the safest compatibility default and, with four slices at 1080p, has
+excellent decoder headroom. HEVC's primary advantage is compression efficiency
+at a chosen visual quality or network budget—not guaranteed lower decode time.
+In matched byte-rate tests, codec ordering changed with content:
+
+- HEVC was 8.68% faster for the 1080p `testsrc2` pair.
+- HEVC was 57.56% slower for a very low-entropy 1080p pair.
+- HEVC was 4.97% slower at 1440p and 7.22% slower at 4K.
+
+Use HEVC for higher quality per bit or constrained bandwidth, then benchmark
+the actual sender encoder and content. Do not advertise both formats as a loose
+mask and accept whatever arrives; negotiate the exact selected format and
+reject an unexpected codec/layout.
+
+Main10 must be a separate mode requiring the sender's exact Main10 support. Keep HEVC Main available as SDR fallback.
+
+## VP9 and AV1
+
+A console A control proved the decoder can
+query memory, create/reset the VP9 decoder, accept one locally generated
+Profile 0 keyframe, and return one valid, error-free 1920x1080 picture in the
+caller-owned direct-memory frame allocation. The returned codec was VP9, with
+pitch and byte pitch both 2048.
+
+Matched 60-frame decode-only controls averaged 5.533 ms at 1080p, 8.617 ms at
+1440p, and 17.407 ms at 4K after excluding each cold frame. Batch throughput
+was 173.09, 112.69, and 55.57 FPS. The single-tile depth-one 4K stream therefore
+decoded successfully but did not sustain 60 FPS.
+
+A matched 4K tile control changed only the stream from one tile column to four.
+Encoded size increased 0.06%, while depth-one throughput rose to 79.10 FPS and
+steady decode time fell to 12.376 ms. Reusing those exact four-tile bytes at
+pipeline depth three produced 58 outputs during 60 submissions, drained the
+final two, and sustained 187.39 FPS across the complete batch. Median
+submission time was 4.633 ms; median output-ready latency was 15.082 ms with a
+21.571 ms p95.
+
+The same four-tile stream then ran through serialized depth-one decode and
+exact-pointer presentation. Frames 1 through 59 averaged 12.311 ms from
+submission to output ready and 16.676 ms from AU ready to completed flip,
+sustaining 59.95 FPS. A controlled chart showed the complete frame, expected
+color order, and fine-detail regions. This validates the tested 8-bit
+two-plane presentation path.
+
+Profile 2 was then proven separately at 1080p and 4K. Active samples occupied
+low-aligned ten-bit words, not conventional MSB-aligned P010. The four-tile 4K
+stream reached 72.37 FPS at depth one and 170.51 FPS at depth three, with the
+same 58-submit/two-drain behavior. A three-slot depth-three pipeline presented
+all 60 outputs through a 10-bit HDR target at 59.53 FPS paced cadence. Average
+submission was 0.401 ms and AU-ready-to-completed-flip pipeline latency was
+40.483 ms; these are distinct measurements.
+
+A non-synthetic-video Profile 0 control ran three identical 60-frame passes at
+288.71, 278.44, and 287.01 FPS (287.01 FPS median). Its ten-minute paced
+extension processed 36,000 4K60 frames with no full-frame deadline misses and
+0.326/1.068 ms average/maximum submission occupancy. These results apply only
+to that stream and decoder policy.
+
+VP9 packetization needs codec-specific handling. A compound superframe packet
+was rejected when submitted whole but every coded frame was accepted after the
+standard superframe index was split. Hidden alternate-reference frames still
+produced decoder outputs and must be submitted while presentation is
+suppressed. A show-existing-frame command produced a valid output in the newly
+supplied caller frame slot rather than returning the older reference pointer.
+See the [packetization example](../examples/vp9/packetization.cpp).
+
+Malformed input returned a decoder error, after which reset recovered on a
+known-good keyframe without recreating the process. The same decoder also
+accepted keyframe-driven 1080p-to-4K-to-1080p changes within its configured 4K
+maximum. Client code should still treat unexpected changes as guarded
+boundaries and retain strict output validation.
+
+No AV1 decode is reported in this research. Do not advertise AV1 unless a
+concrete decode is first proven on the console.
+
+Sony's
+[Media Gallery format list](https://www.playstation.com/en-gb/support/hardware/play-video-music-discs-usb-drives/)
+is consistent supporting evidence: it lists H.264 and VP9 for USB video up to
+3840x2160 and does not list AV1. That consumer application list is not, by
+itself, a hardware capability table.
+
+RDNA2 generation alone does not establish the fixed-function video block retained in Sony's custom
+SoC, and it cannot prove physical presence or absence.
